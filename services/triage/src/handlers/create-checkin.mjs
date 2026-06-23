@@ -76,6 +76,7 @@ export async function handler(event, injectedDeps = null) {
     });
   } catch (err) {
     if (err instanceof CheckinError) {
+      console.warn('Request failed', { code: err.code });
       return apiResponse(err.statusCode, {
         success: false,
         error: {
@@ -85,8 +86,7 @@ export async function handler(event, injectedDeps = null) {
       });
     }
 
-    // Log internally but do not leak error causes or stack traces to standard client responses
-    console.error('Unhandled server error:', err);
+    console.error('Unhandled server error');
     return apiResponse(500, {
       success: false,
       error: {

@@ -1,12 +1,10 @@
-# MediQueue Triage Service & Patient Check-In API
+# MediQueue Triage Service & Staff Queue API
 
-This folder contains the backend, Amazon Bedrock triage-support logic, and the Patient Check-In API handler.
-
-The primary goal of this service is to receive patient check-ins, validate details, call Bedrock to generate a symptom summary and priority suggestion, assign a sequential queue number, and persist the record in DynamoDB.
+This folder contains the backend, Amazon Bedrock triage-support logic, and Lambda handlers for both patient check-ins and staff queue dashboard endpoints.
 
 ---
 
-## Important Safety Rules
+## Important Safety and Security Rules
 
 > [!IMPORTANT]
 > **NO DIAGNOSIS:** This service MUST NOT diagnose the patient. It must not mention potential disease names, syndromes, or medical conditions.
@@ -18,6 +16,15 @@ The primary goal of this service is to receive patient check-ins, validate detai
 > **FAIL CLOSED:** If validation of the Bedrock response or the request body fails, the execution terminates immediately and no data is saved to DynamoDB.
 >
 > **DUMMY DATA ONLY:** Only use dummy patient data during development and testing. Do not commit or transmit real patient information.
+>
+> **STAFF AUTHENTICATION LIMITATION:** Staff authentication is not implemented in this milestone. These endpoints must not be exposed publicly in production without authentication and authorization.
+
+---
+
+## GSI Eventual Consistency & Consistent Reads
+
+- **GET /queue (Eventually Consistent)**: Global secondary index reads are eventually consistent. A newly created or updated check-in may take a short time to appear in the staff queue because the queue is read through a DynamoDB Global Secondary Index.
+- **GET /patients/{patientId} (Strongly Consistent)**: Detail retrievals fetch the check-in record directly from the base table using a strongly consistent read (`ConsistentRead: true`) to ensure the latest status is immediately loaded.
 
 ---
 
@@ -32,24 +39,34 @@ services/triage/
 │   │   └── analyse-symptoms.mjs          # Core symptom analysis pipeline
 │   ├── errors/
 │   │   ├── triage-error.mjs              # Custom error definition for Bedrock
-│   │   └── checkin-error.mjs             # Custom error definition for API/Check-in
+│   │   ├── checkin-error.mjs             # Custom error definition for Check-in
+│   │   └── api-error.mjs                 # Custom error definition for Staff APIs
 │   ├── handlers/
-│   │   └── create-checkin.mjs            # AWS Lambda Proxy Handler entrypoint
+│   │   ├── create-checkin.mjs            # AWS Lambda Proxy Handler for POST /check-ins
+│   │   ├── get-queue.mjs                 # AWS Lambda Proxy Handler for GET /queue
+│   │   └── get-patient.mjs               # AWS Lambda Proxy Handler for GET /patients/{id}
+│   ├── pagination/
+│   │   └── pagination-token.mjs          # base64url pagination token serializer
 │   ├── queue/
 │   │   └── generate-queue-number.mjs      # Atomic queue counter logic
 │   ├── repositories/
-│   │   └── patient-repository.mjs        # DynamoDB CRUD operations
+│   │   └── patient-repository.mjs        # DynamoDB CRUD operations (Query & Get)
 │   ├── responses/
 │   │   └── api-response.mjs              # HTTP response helper
 │   ├── services/
-│   │   └── create-checkin-service.mjs    # Business service orchestration
+│   │   ├── create-checkin-service.mjs    # Check-in business service
+│   │   ├── get-queue-service.mjs         # Queue list retrieval service
+│   │   └── get-patient-service.mjs       # Patient details retrieval service
 │   └── validation/
 │       ├── validate-patient-input.mjs    # Symptom details validation
 │       ├── validate-triage-response.mjs  # Bedrock response schema checks
-│       └── validate-checkin-request.mjs  # Check-in request schema checks
+│       ├── validate-checkin-request.mjs  # Check-in request schema checks
+│       ├── validate-queue-query.mjs      # Queue parameter validations
+│       └── validate-patient-id.mjs       # UUID v4 structural validation
 ├── tests/
 │   ├── triage-validation.test.mjs        # Offline Bedrock/validation tests
-│   └── create-checkin.test.mjs           # Offline check-in logic tests
+│   ├── create-checkin.test.mjs           # Offline check-in handler tests
+│   └── queue-details.test.mjs            # Offline staff queue handler tests
 ├── bedrock-test.mjs                      # Live integration test runner
 ├── package.json
 └── README.md
@@ -57,65 +74,103 @@ services/triage/
 
 ---
 
-## DynamoDB Global Secondary Index (GSI) Contract
+## Environment Variables
 
-To support efficient date-based first-come-first-served queries for the hospital staff dashboard without scanning the table, the table must be configured with a Global Secondary Index (GSI) matching this contract:
+Copy `.env.example` to `.env`. The following environment variables are required:
 
-* **Index Name**: `gsi1` (or as configured in infrastructure)
-* **Partition Key (GSI PK)**: `gsi1pk` (Type: String)
-  - Format: `QUEUE#YYYY-MM-DD`
-* **Sort Key (GSI SK)**: `gsi1sk` (Type: String)
-  - Format: `createdAt_timestamp#patientId` (e.g. `2026-06-23T14:30:00.000Z#patient-uuid`)
-
-*Note: Daily counter items (`id = COUNTER#YYYYMMDD`) must not include GSI attributes (`gsi1pk`/`gsi1sk`), keeping the GSI sparse and performant.*
+| Variable | Description | Example / Placeholder |
+| :--- | :--- | :--- |
+| `BEDROCK_MODEL_ID` | The exact Amazon Bedrock model ID. **(Required)** | `us.amazon.nova-lite-v1:0` (placeholder) |
+| `AWS_REGION` | The AWS Region to target (defaults to `us-west-2`). | `us-west-2` (placeholder) |
+| `PATIENTS_TABLE_NAME` | The DynamoDB table name for storing check-in records. | `MediQueuePatientsTable-Dev` |
+| `PATIENTS_QUEUE_INDEX_NAME` | The name of the GSI queue index. | `gsi1` |
 
 ---
 
-## API Specifications (POST `/check-ins`)
+## DynamoDB Index Contracts
 
-### Request Body Example
+### Global Secondary Index (GSI)
+To support sorting by check-in time (`createdAt`), configure `PATIENTS_QUEUE_INDEX_NAME` as:
+- **Partition Key**: `gsi1pk` (Type: String, e.g. `QUEUE#YYYY-MM-DD`)
+- **Sort Key**: `gsi1sk` (Type: String, e.g. `2026-06-23T14:30:00.000Z#uuid`)
+- **Projection Type**: `INCLUDE`
+- **Projected Attributes**: `entityType`, `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment`, `staffDecision`, `createdAt`
+
+---
+
+## API Endpoints
+
+### 1. POST `/check-ins` (Patient Check-in)
+Submits a symptom report and generates a wait ticket.
+- **Request Body**: Name, age, phone number, symptoms list, details.
+- **Response**: Assigned queue number, status, AI assessment, and uuid.
+
+### 2. GET `/queue` (Staff Queue List)
+Retrieves the check-in queue list for a specific date.
+- **Query Parameters**:
+  - `date` (Optional): `YYYY-MM-DD` (UTC). Defaults to current date.
+  - `limit` (Optional): Number between 1 and 50 (defaults to 20).
+  - `nextToken` (Optional): Opaque token.
+- **Response Payload**:
 ```json
 {
-  "fullName": "Demo Patient",
-  "age": 31,
-  "phoneNumber": "0200000000",
-  "symptoms": [
-    "Weakness",
-    "Dizziness"
-  ],
-  "additionalDetails": "Symptoms started several hours ago."
+  "success": true,
+  "data": {
+    "date": "2026-06-23",
+    "patients": [
+      {
+        "patientId": "e2ba9317-a02d-45db-9c3f-4e09f584fa71",
+        "queueNumber": "MQ-20260623-0001",
+        "fullName": "Demo Patient",
+        "age": 31,
+        "status": "WAITING",
+        "aiAssessment": {
+          "summary": "Patient reports weakness.",
+          "redFlags": [],
+          "suggestedPriority": "MEDIUM",
+          "requiresImmediateStaffReview": true
+        },
+        "staffDecision": {
+          "confirmedPriority": null
+        },
+        "createdAt": "2026-06-23T14:30:00.000Z"
+      }
+    ],
+    "nextToken": null
+  }
 }
 ```
 
-### Success Response Example (HTTP 201)
+### 3. GET `/patients/{patientId}` (Staff Patient Details)
+Retrieves the full check-in record details.
+- **Response Payload**:
 ```json
 {
   "success": true,
   "data": {
     "patientId": "e2ba9317-a02d-45db-9c3f-4e09f584fa71",
     "queueNumber": "MQ-20260623-0001",
-    "status": "WAITING",
+    "fullName": "Demo Patient",
+    "age": 31,
+    "phoneNumber": "0200000000",
+    "symptoms": ["Weakness", "Dizziness"],
+    "additionalDetails": "Symptoms started several hours ago.",
     "aiAssessment": {
-      "summary": "Patient reports weakness and dizziness.",
+      "summary": "Patient reports weakness.",
       "redFlags": [],
       "suggestedPriority": "MEDIUM",
-      "reason": "Symptom descriptions require timely review.",
+      "reason": "Staff review is required.",
       "requiresImmediateStaffReview": true
     },
-    "createdAt": "2026-06-23T14:30:00.000Z"
-  }
-}
-```
-
-### Controlled Error Responses
-Error payloads are standardized to avoid leaking stack traces or internal AWS infrastructure details:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR | INVALID_JSON | TRIAGE_PROCESSING_ERROR | QUEUE_NUMBER_ERROR | DATABASE_ERROR | CONFIGURATION_ERROR | INTERNAL_ERROR",
-    "message": "Client safe error description"
+    "staffDecision": {
+      "confirmedPriority": null,
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "overrideReason": null
+    },
+    "status": "WAITING",
+    "createdAt": "2026-06-23T14:30:00.000Z",
+    "updatedAt": "2026-06-23T14:30:00.000Z"
   }
 }
 ```
@@ -130,14 +185,15 @@ npm install
 ```
 
 ### 1. Run All Offline Unit and Logic Tests
-Verify input validations, response parsing, counter generation, and service workflow logic offline using injected mock dependencies:
+Verify check-in, queue, details, validations, pagination tokens, and handler proxy logic offline using injected mock dependencies:
 ```bash
 npm test
 ```
-*(Alternatively, run `npm run test:triage` or `npm run test:checkin` to target specific test suites).*
+*(Alternatively, run `npm run test:triage`, `npm run test:checkin`, or `npm run test:queue` to target specific test suites).*
 
 ---
 
-## Known Limitations & Future Improvements
+## Known Limitations
 
-* **Request Idempotency**: Request idempotency is not implemented. Repeating the same check-in request may create multiple patient records and allocate a different queue number for each submission.
+* **Request Idempotency**: Repeated check-in submissions by a client screen will allocate duplicate queue numbers and store duplicate records.
+* **Pagination Token Security**: Pagination tokens are validated and date-bound but are not cryptographically signed in this hackathon milestone.
