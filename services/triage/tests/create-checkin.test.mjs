@@ -314,45 +314,84 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
   });
 
   await t.test('16. Handler - known CheckinError is mapped to code and status', async () => {
-    const mockDeps = {
-      analyseSymptomsFn: async () => {
-        throw new CheckinError('CONFIGURATION_ERROR', 500, 'Config issue');
-      },
-      generateQueueNumberFn: async () => 'MQ-1',
-      savePatientFn: async () => {},
-      generateIdFn: fixedId,
-      nowFn: fixedNow
+    const originalConsoleWarn = console.warn;
+    let warnLogs = [];
+    console.warn = (...args) => {
+      warnLogs.push(args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' '));
     };
 
-    const payload = { fullName: 'Bob', age: 30, symptoms: ['Headache'] };
-    const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
-    assert.equal(res.statusCode, 500);
-    const body = JSON.parse(res.body);
-    assert.equal(body.success, false);
-    assert.equal(body.error.code, 'CONFIGURATION_ERROR');
-    assert.equal(body.error.message, 'Config issue');
+    try {
+      const mockDeps = {
+        analyseSymptomsFn: async () => {
+          throw new CheckinError('CONFIGURATION_ERROR', 500, 'Config issue');
+        },
+        generateQueueNumberFn: async () => 'MQ-1',
+        savePatientFn: async () => {},
+        generateIdFn: fixedId,
+        nowFn: fixedNow
+      };
+
+      const payload = { fullName: 'Bob', age: 30, symptoms: ['Headache'] };
+      const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
+      assert.equal(res.statusCode, 500);
+      const body = JSON.parse(res.body);
+      assert.equal(body.success, false);
+      assert.equal(body.error.code, 'CONFIGURATION_ERROR');
+      assert.equal(body.error.message, 'Config issue');
+
+      assert.equal(warnLogs.length, 1);
+      assert.ok(warnLogs[0].includes('Request failed'));
+      assert.ok(warnLogs[0].includes('CONFIGURATION_ERROR'));
+      assert.ok(!warnLogs[0].includes('Config issue'));
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
   });
 
   await t.test('17. Handler - unknown error returns 500 INTERNAL_ERROR without internal leak', async () => {
-    const mockDeps = {
-      analyseSymptomsFn: async () => ({
-        summary: 'cough', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false
-      }),
-      generateQueueNumberFn: async () => 'MQ-1',
-      savePatientFn: async () => {},
-      generateIdFn: () => {
-        throw new Error('Database connection string leaked: secretPassword');
-      },
-      nowFn: fixedNow
+    const originalConsoleError = console.error;
+    let errorLogs = [];
+    console.error = (...args) => {
+      errorLogs.push(args.map(arg => typeof arg === 'string' ? arg : (arg instanceof Error ? arg.toString() + '\n' + arg.stack : JSON.stringify(arg))).join(' '));
     };
 
-    const payload = { fullName: 'Charlie', age: 30, symptoms: ['Headache'] };
-    const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
-    assert.equal(res.statusCode, 500);
-    const body = JSON.parse(res.body);
-    assert.equal(body.success, false);
-    assert.equal(body.error.code, 'INTERNAL_ERROR');
-    assert.equal(body.error.message, 'An unexpected internal error occurred');
-    assert.ok(!res.body.includes('secretPassword')); // No credential leak!
+    try {
+      const mockDeps = {
+        analyseSymptomsFn: async () => ({
+          summary: 'cough', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false
+        }),
+        generateQueueNumberFn: async () => 'MQ-1',
+        savePatientFn: async () => {},
+        generateIdFn: () => {
+          throw new Error('Database connection string leaked: secretPassword');
+        },
+        nowFn: fixedNow
+      };
+
+      const payload = { fullName: 'Charlie', age: 30, symptoms: ['Headache'] };
+      const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
+      assert.equal(res.statusCode, 500);
+      const body = JSON.parse(res.body);
+      assert.equal(body.success, false);
+      assert.equal(body.error.code, 'INTERNAL_ERROR');
+      assert.equal(body.error.message, 'An unexpected internal error occurred');
+
+      // Response validation
+      assert.ok(!res.body.includes('secretPassword'));
+      assert.ok(!res.body.includes('Database connection string leaked'));
+      assert.ok(!res.body.includes('stack'));
+      assert.ok(!res.body.includes('cause'));
+
+      // Log validation
+      assert.equal(errorLogs.length, 1);
+      const logMsg = errorLogs[0];
+      assert.ok(!logMsg.includes('secretPassword'));
+      assert.ok(!logMsg.includes('Database connection string leaked'));
+      assert.ok(!logMsg.includes('Error'));
+      assert.ok(!logMsg.includes('stack'));
+      assert.equal(logMsg.trim(), 'Unhandled server error');
+    } finally {
+      console.error = originalConsoleError;
+    }
   });
 });
