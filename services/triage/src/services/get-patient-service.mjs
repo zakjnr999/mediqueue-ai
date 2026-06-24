@@ -54,7 +54,8 @@ export async function getPatientService(patientId, deps = {}) {
       confirmedPriority: sd.confirmedPriority !== undefined ? sd.confirmedPriority : null,
       reviewedBy: sd.reviewedBy !== undefined ? sd.reviewedBy : null,
       reviewedAt: sd.reviewedAt !== undefined ? sd.reviewedAt : null,
-      overrideReason: sd.overrideReason !== undefined ? sd.overrideReason : null
+      overrideReason: sd.overrideReason !== undefined ? sd.overrideReason : null,
+      reviewerDisplayName: sd.reviewerDisplayName !== undefined ? sd.reviewerDisplayName : null
     },
     status: item.status || 'WAITING',
     createdAt: item.createdAt || '',
@@ -67,6 +68,13 @@ export async function getPatientService(patientId, deps = {}) {
   }
   if (item.additionalDetails !== undefined && item.additionalDetails !== null) {
     payload.additionalDetails = item.additionalDetails;
+  }
+  // Sensitive patient fields - included in patient details only, never in queue list
+  if (item.sex !== undefined && item.sex !== null) {
+    payload.sex = item.sex;
+  }
+  if (item.selfAssessedUrgency !== undefined && item.selfAssessedUrgency !== null) {
+    payload.selfAssessedUrgency = item.selfAssessedUrgency;
   }
 
   return payload;

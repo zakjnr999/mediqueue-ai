@@ -19,18 +19,42 @@ export function isValidCalendarDate(dateStr) {
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
+const ALLOWED_STATUS_VALUES = ['WAITING', 'IN_PROGRESS', 'COMPLETED'];
+
+/**
+ * Normalizes filter values for token serialization.
+ * Converts string "true"/"false" to boolean, null to null, status to trimmed or null.
+ *
+ * @param {object} filters - Raw filter values from validated query
+ * @returns {object} Normalized filters object
+ */
+function normalizeFilters(filters) {
+  const status = filters && filters.status ? filters.status.trim() : null;
+  const hasRedFlags = filters && filters.hasRedFlags !== undefined && filters.hasRedFlags !== null
+    ? filters.hasRedFlags === true || filters.hasRedFlags === 'true'
+    : null;
+  return { status, hasRedFlags };
+}
+
 /**
  * Serializes a LastEvaluatedKey into a base64url encoded opaque token string.
+ * Includes filter context to bind the token to the current filter combination.
  * 
  * @param {object} lastEvaluatedKey 
  * @param {string} dateStr - The request date YYYY-MM-DD
+ * @param {object} [filters] - Optional filter context { status, hasRedFlags }
  * @returns {string|null}
  */
-export function serializeToken(lastEvaluatedKey, dateStr) {
+export function serializeToken(lastEvaluatedKey, dateStr, filters = null) {
   if (!lastEvaluatedKey) return null;
+  const normalizedFilters = normalizeFilters(filters);
   const payload = {
-    v: 1,
+    v: 2,
     date: dateStr,
+    filters: {
+      status: normalizedFilters.status || null,
+      hasRedFlags: normalizedFilters.hasRedFlags !== null ? normalizedFilters.hasRedFlags : null
+    },
     key: {
       id: lastEvaluatedKey.id,
       gsi1pk: lastEvaluatedKey.gsi1pk,
@@ -42,13 +66,15 @@ export function serializeToken(lastEvaluatedKey, dateStr) {
 
 /**
  * Deserializes and strictly validates a base64url token into a DynamoDB ExclusiveStartKey.
+ * Validates date, filter context, and key structure.
  * 
  * @param {string} token 
  * @param {string} requestedDate - The request date YYYY-MM-DD
+ * @param {object} [requestedFilters] - The current request's filter values { status, hasRedFlags }
  * @returns {object|null}
  * @throws {ApiError}
  */
-export function deserializeToken(token, requestedDate) {
+export function deserializeToken(token, requestedDate, requestedFilters = null) {
   if (!token) return null;
 
   if (typeof token !== 'string' || token.trim() === '') {
@@ -71,14 +97,14 @@ export function deserializeToken(token, requestedDate) {
     throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token is not a valid JSON object');
   }
 
-  // Check top-level keys
+  // Check top-level keys for v2: v, date, filters, key
   const topKeys = Object.keys(parsed);
-  const requiredTopKeys = ['v', 'date', 'key'];
+  const requiredTopKeys = ['v', 'date', 'filters', 'key'];
   if (topKeys.length !== requiredTopKeys.length || !requiredTopKeys.every(k => topKeys.includes(k))) {
     throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token structure is invalid');
   }
 
-  if (parsed.v !== 1) {
+  if (parsed.v !== 2) {
     throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Unsupported pagination token version');
   }
 
@@ -88,6 +114,35 @@ export function deserializeToken(token, requestedDate) {
 
   if (parsed.date !== requestedDate) {
     throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token date does not match the requested queue date');
+  }
+
+  // Validate filters object
+  const filterObj = parsed.filters;
+  if (typeof filterObj !== 'object' || filterObj === null || Array.isArray(filterObj)) {
+    throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token filters must be a valid object');
+  }
+
+  const filterKeys = Object.keys(filterObj);
+  const requiredFilterKeys = ['status', 'hasRedFlags'];
+  if (filterKeys.length !== requiredFilterKeys.length || !requiredFilterKeys.every(k => filterKeys.includes(k))) {
+    throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token filter structure is invalid');
+  }
+
+  // Validate token filter values
+  if (filterObj.status !== null && !ALLOWED_STATUS_VALUES.includes(filterObj.status)) {
+    throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token contains an invalid status filter');
+  }
+  if (filterObj.hasRedFlags !== null && typeof filterObj.hasRedFlags !== 'boolean') {
+    throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token contains an invalid hasRedFlags filter');
+  }
+
+  // Validate token filters match requested filters
+  const reqFilters = normalizeFilters(requestedFilters);
+  if (filterObj.status !== reqFilters.status) {
+    throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token status filter does not match the current request');
+  }
+  if (filterObj.hasRedFlags !== reqFilters.hasRedFlags) {
+    throw new ApiError('INVALID_PAGINATION_TOKEN', 400, 'Pagination token red-flag filter does not match the current request');
   }
 
   const keyObj = parsed.key;

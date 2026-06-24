@@ -14,7 +14,7 @@ export function validateCheckinRequest(body) {
   }
 
   // Reject unexpected top-level request properties
-  const allowedKeys = ['fullName', 'age', 'phoneNumber', 'symptoms', 'additionalDetails'];
+  const allowedKeys = ['fullName', 'age', 'phoneNumber', 'symptoms', 'additionalDetails', 'sex', 'selfAssessedUrgency'];
   const actualKeys = Object.keys(body);
   for (const key of actualKeys) {
     if (!allowedKeys.includes(key)) {
@@ -105,6 +105,32 @@ export function validateCheckinRequest(body) {
       }
       normalized.additionalDetails = trimmedDetails;
     }
+  }
+
+  // Validate sex (optional)
+  const ALLOWED_SEX_VALUES = ['Male', 'Female', 'Prefer not to say'];
+  if (body.sex !== undefined && body.sex !== null) {
+    if (typeof body.sex !== 'string') {
+      throw new CheckinError('VALIDATION_ERROR', 400, 'Field "sex" must be a string');
+    }
+    const trimmedSex = body.sex.trim();
+    if (!ALLOWED_SEX_VALUES.includes(trimmedSex)) {
+      throw new CheckinError('VALIDATION_ERROR', 400, 'Field "sex" must be one of: Male, Female, Prefer not to say');
+    }
+    normalized.sex = trimmedSex;
+  }
+
+  // Validate selfAssessedUrgency (optional)
+  const ALLOWED_URGENCY_VALUES = ['Minor', 'Moderate', 'Urgent'];
+  if (body.selfAssessedUrgency !== undefined && body.selfAssessedUrgency !== null) {
+    if (typeof body.selfAssessedUrgency !== 'string') {
+      throw new CheckinError('VALIDATION_ERROR', 400, 'Field "selfAssessedUrgency" must be a string');
+    }
+    const trimmedUrgency = body.selfAssessedUrgency.trim();
+    if (!ALLOWED_URGENCY_VALUES.includes(trimmedUrgency)) {
+      throw new CheckinError('VALIDATION_ERROR', 400, 'Field "selfAssessedUrgency" must be one of: Minor, Moderate, Urgent');
+    }
+    normalized.selfAssessedUrgency = trimmedUrgency;
   }
 
   return normalized;

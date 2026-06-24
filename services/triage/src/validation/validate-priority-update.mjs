@@ -15,12 +15,17 @@ export function validatePriorityUpdate(body, suggestedPriority) {
   }
 
   // Reject unexpected properties
-  const allowedKeys = ['confirmedPriority', 'overrideReason'];
+  const allowedKeys = ['confirmedPriority', 'overrideReason', 'reviewerDisplayName'];
   const actualKeys = Object.keys(body);
   for (const key of actualKeys) {
     if (!allowedKeys.includes(key)) {
       throw new ApiError('VALIDATION_ERROR', 400, `Unexpected request property: "${key}"`);
     }
+  }
+
+  // reviewedBy must NEVER be accepted from client input
+  if (body.reviewedBy !== undefined && body.reviewedBy !== null) {
+    throw new ApiError('VALIDATION_ERROR', 400, 'reviewedBy is not accepted from client input');
   }
 
   if (body.confirmedPriority === undefined || body.confirmedPriority === null) {
@@ -59,8 +64,24 @@ export function validatePriorityUpdate(body, suggestedPriority) {
     }
   }
 
+  // Validate reviewerDisplayName (optional, unverified display label)
+  let rdn = null;
+  if (body.reviewerDisplayName !== undefined && body.reviewerDisplayName !== null) {
+    if (typeof body.reviewerDisplayName !== 'string') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'reviewerDisplayName must be a string');
+    }
+    rdn = body.reviewerDisplayName.trim();
+    if (rdn === '') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'reviewerDisplayName cannot be empty when provided');
+    }
+    if (rdn.length > 100) {
+      throw new ApiError('VALIDATION_ERROR', 400, 'reviewerDisplayName must not exceed 100 characters');
+    }
+  }
+
   return {
     confirmedPriority: cp,
-    overrideReason: or
+    overrideReason: or,
+    reviewerDisplayName: rdn
   };
 }

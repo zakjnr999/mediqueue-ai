@@ -13,7 +13,7 @@ import { ApiError } from '../src/errors/api-error.mjs';
 test('Staff APIs - Pagination Token Tests', async (t) => {
   const dateStr = '2026-06-23';
 
-  await t.test('token round-trip succeeds', () => {
+  await t.test('token round-trip succeeds (v2 with no filters)', () => {
     const key = {
       id: 'PATIENT#550e8400-e29b-41d4-a716-446655440000',
       gsi1pk: 'QUEUE#2026-06-23',
@@ -25,6 +25,65 @@ test('Staff APIs - Pagination Token Tests', async (t) => {
 
     const decoded = deserializeToken(token, dateStr);
     assert.deepEqual(decoded, key);
+  });
+
+  await t.test('token round-trip with filters (v2)', () => {
+    const key = {
+      id: 'PATIENT#550e8400-e29b-41d4-a716-446655440000',
+      gsi1pk: 'QUEUE#2026-06-23',
+      gsi1sk: '2026-06-23T14:30:00.000Z#550e8400-e29b-41d4-a716-446655440000'
+    };
+    const filters = { status: 'WAITING', hasRedFlags: true };
+    const token = serializeToken(key, dateStr, filters);
+    assert.ok(token);
+
+    const decoded = deserializeToken(token, dateStr, filters);
+    assert.deepEqual(decoded, key);
+  });
+
+  await t.test('v2 token with filters rejected when requested filters mismatch', () => {
+    const key = {
+      id: 'PATIENT#550e8400-e29b-41d4-a716-446655440000',
+      gsi1pk: 'QUEUE#2026-06-23',
+      gsi1sk: '2026-06-23T14:30:00.000Z#550e8400-e29b-41d4-a716-446655440000'
+    };
+    const tokenFilters = { status: 'WAITING' };
+    const requestFilters = { status: 'IN_PROGRESS' }; // mismatch
+    const token = serializeToken(key, dateStr, tokenFilters);
+
+    assert.throws(
+      () => deserializeToken(token, dateStr, requestFilters),
+      (err) => err.code === 'INVALID_PAGINATION_TOKEN'
+    );
+  });
+
+  await t.test('v2 token without filters works when no filters requested', () => {
+    const key = {
+      id: 'PATIENT#550e8400-e29b-41d4-a716-446655440000',
+      gsi1pk: 'QUEUE#2026-06-23',
+      gsi1sk: '2026-06-23T14:30:00.000Z#550e8400-e29b-41d4-a716-446655440000'
+    };
+    // Token with no filters
+    const token = serializeToken(key, dateStr);
+    // Request also with no filters
+    const decoded = deserializeToken(token, dateStr);
+    assert.deepEqual(decoded, key);
+  });
+
+  await t.test('v2 token with filters rejected when request has different filter key', () => {
+    const key = {
+      id: 'PATIENT#550e8400-e29b-41d4-a716-446655440000',
+      gsi1pk: 'QUEUE#2026-06-23',
+      gsi1sk: '2026-06-23T14:30:00.000Z#550e8400-e29b-41d4-a716-446655440000'
+    };
+    const tokenFilters = { status: 'WAITING' };
+    const requestFilters = { hasRedFlags: true }; // completely different filter
+    const token = serializeToken(key, dateStr, tokenFilters);
+
+    assert.throws(
+      () => deserializeToken(token, dateStr, requestFilters),
+      (err) => err.code === 'INVALID_PAGINATION_TOKEN'
+    );
   });
 
   await t.test('token longer than the allowed limit is rejected', () => {
@@ -42,7 +101,7 @@ test('Staff APIs - Pagination Token Tests', async (t) => {
       gsi1sk: '2026-06-23T14:30:00.000Z#550e8400-e29b-41d4-a716-446655440000'
     }, dateStr);
     const decoded = JSON.parse(Buffer.from(badVersion, 'base64url').toString('utf8'));
-    decoded.v = 2; // invalid version
+    decoded.v = 3; // v3 is not supported
     const token = Buffer.from(JSON.stringify(decoded), 'utf8').toString('base64url');
 
     assert.throws(
@@ -223,6 +282,29 @@ test('Staff APIs - Validation Tests', async (t) => {
       () => validateQueueQuery({ date: '2026-06-23', invalidParam: 'bad' }),
       (err) => err.code === 'VALIDATION_ERROR'
     );
+
+    // Valid status filter
+    const withStatus = validateQueueQuery({ status: 'WAITING' });
+    assert.equal(withStatus.status, 'WAITING');
+
+    // Invalid status value
+    assert.throws(
+      () => validateQueueQuery({ status: 'DISCHARGED' }),
+      (err) => err.code === 'VALIDATION_ERROR'
+    );
+
+    // Valid hasRedFlags filter
+    const withRedFlags = validateQueueQuery({ hasRedFlags: 'true' });
+    assert.equal(withRedFlags.hasRedFlags, true);
+
+    const withoutRedFlags = validateQueueQuery({ hasRedFlags: 'false' });
+    assert.equal(withoutRedFlags.hasRedFlags, false);
+
+    // Invalid hasRedFlags value
+    assert.throws(
+      () => validateQueueQuery({ hasRedFlags: 'yes' }),
+      (err) => err.code === 'VALIDATION_ERROR'
+    );
   });
 
   await t.test('validatePatientId works correctly', () => {
@@ -289,8 +371,16 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
         items: samplePatients,
         lastEvaluatedKey: { id: 'PATIENT#1', gsi1pk: 'QUEUE#2026-06-23', gsi1sk: '1' }
       }),
-      serializeTokenFn: () => 'mock-next-token',
-      deserializeTokenFn: () => null,
+      serializeTokenFn: (key, date, filters) => {
+        // Verify filter context is passed to serializeToken
+        assert.deepEqual(filters, {});
+        return 'mock-next-token';
+      },
+      deserializeTokenFn: (token, date, requestedFilters) => {
+        // Verify filter context is passed to deserializeToken
+        assert.deepEqual(requestedFilters, {});
+        return null;
+      },
       nowFn: fixedNow
     };
 
@@ -319,7 +409,131 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
     });
   });
 
+  await t.test('GET /queue service passes filters to token functions', async () => {
+    const deps = {
+      queryPatientQueueFn: async () => ({
+        items: [samplePatients[0]],
+        lastEvaluatedKey: null
+      }),
+      serializeTokenFn: (key, date, filters) => {
+        assert.deepEqual(filters, { status: 'WAITING' });
+        return 'filtered-token';
+      },
+      deserializeTokenFn: (token, date, requestedFilters) => {
+        assert.deepEqual(requestedFilters, { status: 'WAITING' });
+        return null;
+      },
+      nowFn: fixedNow
+    };
+
+    const result = await getQueueService({ status: 'WAITING' }, deps);
+    assert.equal(result.patients.length, 1);
+    assert.equal(result.nextToken, 'filtered-token');
+  });
+
+  await t.test('GET /queue service applies in-memory status filter', async () => {
+    const items = [
+      { ...samplePatients[0], patientId: '1', status: 'WAITING' },
+      { ...samplePatients[0], patientId: '2', status: 'IN_PROGRESS' },
+      { ...samplePatients[0], patientId: '3', status: 'COMPLETED' }
+    ];
+
+    const deps = {
+      queryPatientQueueFn: async () => ({ items, lastEvaluatedKey: null }),
+      serializeTokenFn: () => null,
+      deserializeTokenFn: () => null,
+      nowFn: fixedNow
+    };
+
+    // Filter: WAITING
+    const result = await getQueueService({ status: 'WAITING' }, deps);
+    assert.equal(result.patients.length, 1);
+    assert.equal(result.patients[0].patientId, '1');
+
+    // Filter: IN_PROGRESS
+    const result2 = await getQueueService({ status: 'IN_PROGRESS' }, deps);
+    assert.equal(result2.patients.length, 1);
+    assert.equal(result2.patients[0].patientId, '2');
+
+    // No filter returns all
+    const result3 = await getQueueService({}, deps);
+    assert.equal(result3.patients.length, 3);
+  });
+
+  await t.test('GET /queue service applies in-memory hasRedFlags filter', async () => {
+    const items = [
+      { ...samplePatients[0], patientId: '1', aiAssessment: { redFlags: ['Fever'] } },
+      { ...samplePatients[0], patientId: '2', aiAssessment: { redFlags: [] } }
+    ];
+
+    const deps = {
+      queryPatientQueueFn: async () => ({ items, lastEvaluatedKey: null }),
+      serializeTokenFn: () => null,
+      deserializeTokenFn: () => null,
+      nowFn: fixedNow
+    };
+
+    const withFlags = await getQueueService({ hasRedFlags: 'true' }, deps);
+    assert.equal(withFlags.patients.length, 1);
+    assert.equal(withFlags.patients[0].patientId, '1');
+
+    const withoutFlags = await getQueueService({ hasRedFlags: 'false' }, deps);
+    assert.equal(withoutFlags.patients.length, 1);
+    assert.equal(withoutFlags.patients[0].patientId, '2');
+  });
+
+  await t.test('GET /queue service with status and hasRedFlags combined filters', async () => {
+    const items = [
+      { ...samplePatients[0], patientId: '1', status: 'WAITING', aiAssessment: { redFlags: ['Fever'] } },
+      { ...samplePatients[0], patientId: '2', status: 'WAITING', aiAssessment: { redFlags: [] } },
+      { ...samplePatients[0], patientId: '3', status: 'IN_PROGRESS', aiAssessment: { redFlags: ['Pain'] } }
+    ];
+
+    const deps = {
+      queryPatientQueueFn: async () => ({ items, lastEvaluatedKey: null }),
+      serializeTokenFn: () => null,
+      deserializeTokenFn: () => null,
+      nowFn: fixedNow
+    };
+
+    // WAITING + hasRedFlags=true
+    const result = await getQueueService({ status: 'WAITING', hasRedFlags: 'true' }, deps);
+    assert.equal(result.patients.length, 1);
+    assert.equal(result.patients[0].patientId, '1');
+  });
+
   await t.test('GET /patients/{patientId} service checks entityType and validates output structure', async () => {
+    const deps = {
+      getPatientDetailsFn: async () => ({
+        patientId: validUUID,
+        queueNumber: 'MQ-2',
+        fullName: 'Jane',
+        age: 30,
+        symptoms: ['cough'],
+        entityType: 'PATIENT_CHECKIN',
+        aiAssessment: { summary: 'c', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false },
+        staffDecision: { confirmedPriority: null, reviewerDisplayName: 'Dr. Smith' },
+        status: 'WAITING',
+        createdAt: '2026-06-23T14:30:00.000Z',
+        updatedAt: '2026-06-23T14:30:00.000Z',
+        id: `PATIENT#${validUUID}`,
+        gsi1pk: 'QUEUE',
+        sex: 'Female',
+        selfAssessedUrgency: 'Moderate'
+      })
+    };
+
+    const details = await getPatientService(validUUID, deps);
+    assert.equal(details.fullName, 'Jane');
+    assert.equal(details.sex, 'Female');
+    assert.equal(details.selfAssessedUrgency, 'Moderate');
+    assert.equal(details.staffDecision.reviewerDisplayName, 'Dr. Smith');
+    assert.ok(!('id' in details));
+    assert.ok(!('entityType' in details));
+    assert.ok(!('gsi1pk' in details));
+  });
+
+  await t.test('GET /patients/{patientId} omits sex/selfAssessedUrgency when absent', async () => {
     const deps = {
       getPatientDetailsFn: async () => ({
         patientId: validUUID,
@@ -340,9 +554,9 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
 
     const details = await getPatientService(validUUID, deps);
     assert.equal(details.fullName, 'Jane');
-    assert.ok(!('id' in details));
-    assert.ok(!('entityType' in details));
-    assert.ok(!('gsi1pk' in details));
+    assert.ok(!('sex' in details));
+    assert.ok(!('selfAssessedUrgency' in details));
+    assert.equal(details.staffDecision.reviewerDisplayName, null);
   });
 
   await t.test('GET /patients/{patientId} service throws PATIENT_NOT_FOUND on wrong entity type', async () => {

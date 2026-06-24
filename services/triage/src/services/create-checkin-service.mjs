@@ -94,7 +94,8 @@ export async function createCheckinService(rawRequest, deps = {}) {
       confirmedPriority: null,
       reviewedBy: null,
       reviewedAt: null,
-      overrideReason: null
+      overrideReason: null,
+      reviewerDisplayName: null
     },
     status: 'WAITING',
     createdAt: nowIso,
@@ -108,6 +109,13 @@ export async function createCheckinService(rawRequest, deps = {}) {
   if (normalized.additionalDetails !== undefined) {
     item.additionalDetails = normalized.additionalDetails;
   }
+  // Sensitive patient fields - stored but never sent to Bedrock or exposed in queue list
+  if (normalized.sex !== undefined) {
+    item.sex = normalized.sex;
+  }
+  if (normalized.selfAssessedUrgency !== undefined) {
+    item.selfAssessedUrgency = normalized.selfAssessedUrgency;
+  }
 
   // 7. Save item using savePatientFn
   try {
@@ -117,11 +125,21 @@ export async function createCheckinService(rawRequest, deps = {}) {
   }
 
   // 8. Return response payload
-  return {
+  const response = {
     patientId: patientId,
     queueNumber: queueNumber,
     status: 'WAITING',
     aiAssessment: item.aiAssessment,
     createdAt: nowIso
   };
+
+  // Include sensitive patient fields only in the direct check-in response
+  if (item.sex !== undefined) {
+    response.sex = item.sex;
+  }
+  if (item.selfAssessedUrgency !== undefined) {
+    response.selfAssessedUrgency = item.selfAssessedUrgency;
+  }
+
+  return response;
 }
