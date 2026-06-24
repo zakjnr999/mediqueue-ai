@@ -57,6 +57,8 @@ Submits a clinical check-in ticket.
       "selfAssessedUrgency": "Urgent",
       "peopleAhead": 0,
       "estimatedWaitTimeMinutes": 0,
+      "isEscalated": false,
+      "escalatedBy": null,
       "createdAt": "2026-06-24T00:00:00.000Z"
     }
   }
@@ -79,7 +81,22 @@ Queries patients listed on the staff dashboard queue for a specific day.
   * `nextToken` (Optional): Base64url encoded opaque pagination token (v2 — bound to active filters).
   * `status` (Optional): Filter by `WAITING`, `IN_PROGRESS`, or `COMPLETED` (in-memory).
   * `hasRedFlags` (Optional): `"true"` or `"false"` to filter by presence of red flags (in-memory).
-* **Public Attributes Returned**: Only maps queue-relevant fields. Excludes PII details (`fullName` and `phoneNumber` are projects of GSI index and are mapped, but `symptoms`, `additionalDetails`, `sex`, `selfAssessedUrgency`, and DynamoDB keys are stripped).
+  * `sortBy` (Optional): `"time"` or `"priority"` (defaults to `"time"`).
+    - `"time"`: Chronological order based on check-in time (`createdAt` ascending).
+    - `"priority"`: Sorts the queue by clinical severity (priority rank) first, and breaks ties by check-in time (`createdAt` ascending).
+* **Server-Side Queue Sorting Behavior**:
+  * When `sortBy=priority` is specified, patients are sorted in-memory according to the following rank order:
+    1. **Rank 1 (HIGH / Urgent)**: Patients with `isEscalated` set to `true`, or final priority = `HIGH`.
+    2. **Rank 2 (MEDIUM / Moderate)**: Patients with final priority = `MEDIUM`.
+    3. **Rank 3 (LOW / Minor)**: Patients with final priority = `LOW`.
+  * **Final Priority Resolution**: The priority used for sorting is resolved as `staffDecision.confirmedPriority` if it is set (not null); otherwise, it falls back to `aiAssessment.suggestedPriority`. If neither is found, it defaults to `MEDIUM`.
+  * **Tie-Breaking**: If multiple patients have the same priority rank, the system breaks ties by check-in time (`createdAt` ascending — oldest check-ins first) to maintain a fair first-come-first-served sequence.
+* **Frontend-to-Backend Priority Mapping Contract**:
+  The backend triage service stores and returns clinical priorities as `HIGH`, `MEDIUM`, or `LOW`. To align with the dashboard UI designs, the frontend client should map these fields as follows:
+  * `HIGH` ➔ `Urgent`
+  * `MEDIUM` ➔ `Moderate`
+  * `LOW` ➔ `Minor`
+* **Public Attributes Returned**: Only maps queue-relevant fields. Excludes PII details (`fullName` is projected in the GSI index and mapped, but `symptoms`, `additionalDetails`, `sex`, `selfAssessedUrgency`, and DynamoDB keys are stripped).
 * **Success Response (HTTP 200)**:
   ```json
   {
@@ -93,6 +110,8 @@ Queries patients listed on the staff dashboard queue for a specific day.
           "fullName": "John Doe",
           "age": 35,
           "status": "WAITING",
+          "isEscalated": false,
+          "escalatedBy": null,
           "aiAssessment": {
             "summary": "Patient reports shortness of breath...",
             "redFlags": ["Shortness of breath", "Chest tightness"],
@@ -145,6 +164,8 @@ Retrieves a detailed view card of a patient's symptoms and triage details.
         "reviewerDisplayName": null
       },
       "status": "WAITING",
+      "isEscalated": false,
+      "escalatedBy": null,
       "peopleAhead": 0,
       "estimatedWaitTimeMinutes": 0,
       "createdAt": "2026-06-24T00:00:00.000Z",
@@ -374,7 +395,7 @@ Deploy a single DynamoDB table matching the primary key schema and index definit
 * **Projection Type**: `INCLUDE`
 * **Projected Attributes**: `entityType`, `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment`, `staffDecision`, `createdAt`, `isEscalated`, `escalatedBy`
   * **Note**: `sex` and `selfAssessedUrgency` are intentionally excluded from GSI projection (sensitive fields, patient-details only).
-* **Queue Order Behavior**: Querying by `gsi1pk = QUEUE#YYYY-MM-DD` and sorting ascending (ScanIndexForward = true) returns patients ordered by check-in time (First-Come, First-Served).
+* **Queue Order Behavior**: Querying by `gsi1pk = QUEUE#YYYY-MM-DD` and sorting ascending (ScanIndexForward = true) returns patients ordered by check-in time (First-Come, First-Served). When `sortBy=priority` query parameter is provided on `GET /queue`, the service layer sorts the retrieved items in-memory prior to applying pagination limits (see Section 2.2).
 
 ---
 
@@ -517,7 +538,12 @@ curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/check-ins \
 
 ### Step 2: Retrieve Queue List
 ```bash
+# Chronological retrieval (default)
 curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue?limit=10" \
+  -H "Authorization: Bearer <id-token>"
+
+# Priority-sorted retrieval
+curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue?limit=10&sortBy=priority" \
   -H "Authorization: Bearer <id-token>"
 ```
 

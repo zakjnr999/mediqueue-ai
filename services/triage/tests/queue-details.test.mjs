@@ -305,6 +305,23 @@ test('Staff APIs - Validation Tests', async (t) => {
       () => validateQueueQuery({ hasRedFlags: 'yes' }),
       (err) => err.code === 'VALIDATION_ERROR'
     );
+
+    // Valid sortBy filter
+    const withSortPriority = validateQueueQuery({ sortBy: 'priority' });
+    assert.equal(withSortPriority.sortBy, 'priority');
+
+    const withSortTime = validateQueueQuery({ sortBy: 'time' });
+    assert.equal(withSortTime.sortBy, 'time');
+
+    // Default sortBy is time
+    const defaultSort = validateQueueQuery({});
+    assert.equal(defaultSort.sortBy, 'time');
+
+    // Invalid sortBy value
+    assert.throws(
+      () => validateQueueQuery({ sortBy: 'name' }),
+      (err) => err.code === 'VALIDATION_ERROR'
+    );
   });
 
   await t.test('validatePatientId works correctly', () => {
@@ -634,6 +651,78 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       () => getPatientService(validUUID, deps),
       (err) => err instanceof ApiError && err.code === 'PATIENT_NOT_FOUND' && err.statusCode === 404
     );
+  });
+
+  await t.test('GET /queue service sorts by priority and falls back to check-in time', async () => {
+    const queuePatients = [
+      {
+        patientId: 'low-priority-old',
+        entityType: 'PATIENT_CHECKIN',
+        status: 'WAITING',
+        aiAssessment: { suggestedPriority: 'LOW' },
+        createdAt: '2026-06-23T10:00:00.000Z'
+      },
+      {
+        patientId: 'high-priority-new',
+        entityType: 'PATIENT_CHECKIN',
+        status: 'WAITING',
+        aiAssessment: { suggestedPriority: 'HIGH' },
+        createdAt: '2026-06-23T11:00:00.000Z'
+      },
+      {
+        patientId: 'escalated-patient-newest',
+        entityType: 'PATIENT_CHECKIN',
+        status: 'WAITING',
+        isEscalated: true,
+        aiAssessment: { suggestedPriority: 'LOW' },
+        createdAt: '2026-06-23T12:00:00.000Z'
+      },
+      {
+        patientId: 'medium-priority',
+        entityType: 'PATIENT_CHECKIN',
+        status: 'WAITING',
+        aiAssessment: { suggestedPriority: 'MEDIUM' },
+        createdAt: '2026-06-23T10:30:00.000Z'
+      },
+      {
+        patientId: 'high-priority-old',
+        entityType: 'PATIENT_CHECKIN',
+        status: 'WAITING',
+        aiAssessment: { suggestedPriority: 'HIGH' },
+        createdAt: '2026-06-23T09:00:00.000Z'
+      }
+    ];
+
+    const deps = {
+      queryPatientQueueFn: async () => ({ items: queuePatients, lastEvaluatedKey: null }),
+      serializeTokenFn: () => null,
+      deserializeTokenFn: () => null,
+      nowFn: fixedNow
+    };
+
+    // 1. Test sorting by priority
+    const resultPriority = await getQueueService({ sortBy: 'priority' }, deps);
+    const sortedIdsPriority = resultPriority.patients.map(p => p.patientId);
+
+    assert.deepEqual(sortedIdsPriority, [
+      'high-priority-old',
+      'high-priority-new',
+      'escalated-patient-newest',
+      'medium-priority',
+      'low-priority-old'
+    ]);
+
+    // 2. Test sorting by time
+    const resultTime = await getQueueService({ sortBy: 'time' }, deps);
+    const sortedIdsTime = resultTime.patients.map(p => p.patientId);
+
+    assert.deepEqual(sortedIdsTime, [
+      'high-priority-old',
+      'low-priority-old',
+      'medium-priority',
+      'high-priority-new',
+      'escalated-patient-newest'
+    ]);
   });
 
   // Handler integration tests
