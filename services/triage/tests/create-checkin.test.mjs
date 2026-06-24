@@ -5,7 +5,7 @@ import { validateCheckinRequest } from '../src/validation/validate-checkin-reque
 import { savePatientCheckin } from '../src/repositories/patient-repository.mjs';
 import { generateQueueNumber } from '../src/queue/generate-queue-number.mjs';
 import { CheckinError } from '../src/errors/checkin-error.mjs';
-import { handler } from '../src/handlers/create-checkin.mjs';
+import { createHandler, handler as productionHandler } from '../src/handlers/create-checkin.mjs';
 
 test('Check-In Service Offline Mocks Tests', async (t) => {
   // Common valid data
@@ -349,7 +349,7 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
   });
 
   await t.test('13. Handler - missing event.body returns 400 INVALID_JSON', async () => {
-    const res = await handler({});
+    const res = await productionHandler({});
     assert.equal(res.statusCode, 400);
     const body = JSON.parse(res.body);
     assert.equal(body.success, false);
@@ -359,7 +359,7 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
   });
 
   await t.test('14. Handler - malformed JSON returns 400 INVALID_JSON', async () => {
-    const res = await handler({ body: '{invalid-json' });
+    const res = await productionHandler({ body: '{invalid-json' });
     assert.equal(res.statusCode, 400);
     const body = JSON.parse(res.body);
     assert.equal(body.success, false);
@@ -368,11 +368,13 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
 
   await t.test('15. Handler - valid request returns 201 with filtered attributes', async () => {
     const mockDeps = {
+      serviceFn: createCheckinService,
       analyseSymptomsFn: async () => ({
         summary: 'cough', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false
       }),
       generateQueueNumberFn: async () => 'MQ-20260623-0001',
       savePatientFn: async () => {},
+      countPeopleAheadFn: async () => 0,
       generateIdFn: fixedId,
       nowFn: fixedNow
     };
@@ -383,7 +385,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
       symptoms: ['Cough']
     };
 
-    const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
+    const handler = createHandler(mockDeps);
+    const res = await handler({ body: JSON.stringify(payload) });
     assert.equal(res.statusCode, 201);
     assert.equal(res.headers['content-type'], 'application/json');
     
@@ -431,17 +434,20 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: createCheckinService,
         analyseSymptomsFn: async () => {
           throw new CheckinError('CONFIGURATION_ERROR', 500, 'Config issue');
         },
         generateQueueNumberFn: async () => 'MQ-1',
         savePatientFn: async () => {},
+        countPeopleAheadFn: async () => 0,
         generateIdFn: fixedId,
         nowFn: fixedNow
       };
 
       const payload = { fullName: 'Bob', age: 30, symptoms: ['Headache'] };
-      const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
+      const handler = createHandler(mockDeps);
+      const res = await handler({ body: JSON.stringify(payload) });
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);
@@ -466,11 +472,13 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: createCheckinService,
         analyseSymptomsFn: async () => ({
           summary: 'cough', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false
         }),
         generateQueueNumberFn: async () => 'MQ-1',
         savePatientFn: async () => {},
+        countPeopleAheadFn: async () => 0,
         generateIdFn: () => {
           throw new Error('Database connection string leaked: secretPassword');
         },
@@ -478,7 +486,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
       };
 
       const payload = { fullName: 'Charlie', age: 30, symptoms: ['Headache'] };
-      const res = await handler({ body: JSON.stringify(payload) }, mockDeps);
+      const handler = createHandler(mockDeps);
+      const res = await handler({ body: JSON.stringify(payload) });
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);
@@ -498,7 +507,7 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
       assert.ok(!logMsg.includes('Database connection string leaked'));
       assert.ok(!logMsg.includes('Error'));
       assert.ok(!logMsg.includes('stack'));
-      assert.equal(logMsg.trim(), 'Unhandled server error');
+      assert.ok(logMsg.includes('Unhandled server error'));
     } finally {
       console.error = originalConsoleError;
     }

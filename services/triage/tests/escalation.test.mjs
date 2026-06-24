@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { validateEscalationRequest } from '../src/validation/validate-escalation-request.mjs';
 import { escalatePatientService } from '../src/services/escalate-patient-service.mjs';
-import { handler } from '../src/handlers/escalate-patient.mjs';
+import { createHandler, handler as productionHandler } from '../src/handlers/escalate-patient.mjs';
 import { ApiError } from '../src/errors/api-error.mjs';
 
 const validUUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -159,6 +159,7 @@ test('Escalation - Handler Behaviour', async (t) => {
     process.env.PATIENTS_TABLE_NAME = 'TestTable';
 
     const mockDeps = {
+      serviceFn: escalatePatientService,
       getPatientDetailsFn: async () => ({
         patientId: validUUID,
         entityType: 'PATIENT_CHECKIN',
@@ -186,7 +187,8 @@ test('Escalation - Handler Behaviour', async (t) => {
       body: JSON.stringify({ reviewerDisplayName: 'Nurse Rhoda' })
     };
 
-    const res = await handler(event, mockDeps);
+    const handler = createHandler(mockDeps);
+    const res = await handler(event);
     assert.equal(res.statusCode, 200);
 
     const body = JSON.parse(res.body);
@@ -204,6 +206,7 @@ test('Escalation - Handler Behaviour', async (t) => {
       body: JSON.stringify({ reviewerDisplayName: 'Nurse Rhoda' })
     };
 
+    const handler = createHandler({ serviceFn: escalatePatientService });
     const res = await handler(event);
     assert.equal(res.statusCode, 500);
 
@@ -216,6 +219,7 @@ test('Escalation - Handler Behaviour', async (t) => {
     process.env.PATIENTS_TABLE_NAME = 'TestTable';
 
     const mockDeps = {
+      serviceFn: escalatePatientService,
       getPatientDetailsFn: async () => {
         throw new Error('Database password leaked: secret123');
       }
@@ -227,7 +231,8 @@ test('Escalation - Handler Behaviour', async (t) => {
       body: JSON.stringify({ reviewerDisplayName: 'Nurse Rhoda' })
     };
 
-    const res = await handler(event, mockDeps);
+    const handler = createHandler(mockDeps);
+    const res = await handler(event);
     assert.equal(res.statusCode, 500);
 
     const body = JSON.parse(res.body);
