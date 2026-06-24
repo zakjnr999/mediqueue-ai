@@ -58,7 +58,7 @@ export async function getQueueService(queryParams, deps = {}) {
   }
 
   // 6. Filter and map items
-  const filteredPatients = results.items
+  const mappedPatients = results.items
     .filter(item => item && item.entityType === 'PATIENT_CHECKIN')
     // Apply in-memory status filter if requested
     .filter(item => {
@@ -106,12 +106,41 @@ export async function getQueueService(queryParams, deps = {}) {
       };
     });
 
+  // Sort patients list in-memory based on requested criteria
+  if (normalized.sortBy === 'priority') {
+    mappedPatients.sort((a, b) => {
+      const getPriorityRank = (p) => {
+        if (p.isEscalated) return 1;
+        const priority = p.staffDecision?.confirmedPriority || p.aiAssessment?.suggestedPriority || 'MEDIUM';
+        if (priority === 'HIGH') return 1;
+        if (priority === 'MEDIUM') return 2;
+        return 3; // LOW
+      };
+      const rankA = getPriorityRank(a);
+      const rankB = getPriorityRank(b);
+      if (rankA !== rankB) {
+        return rankA - rankB; // Ascending rank: 1 (HIGH) -> 2 (MEDIUM) -> 3 (LOW)
+      }
+      // Break ties by createdAt ascending
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
+    });
+  } else {
+    // Sort purely by createdAt ascending
+    mappedPatients.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
+    });
+  }
+
   // 7. Serialize lastEvaluatedKey into opaque nextToken (includes active filter context)
   const nextToken = serializeTokenFn(results.lastEvaluatedKey, normalized.date, requestedFilters);
 
   return {
     date: normalized.date,
-    patients: filteredPatients,
+    patients: mappedPatients,
     nextToken
   };
 }

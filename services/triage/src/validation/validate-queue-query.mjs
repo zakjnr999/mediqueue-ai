@@ -15,7 +15,7 @@ export function validateQueueQuery(queryParams) {
   }
 
   // Reject unexpected query parameters
-  const allowedKeys = ['date', 'limit', 'nextToken', 'status', 'hasRedFlags'];
+  const allowedKeys = ['date', 'limit', 'nextToken', 'status', 'hasRedFlags', 'sortBy'];
   const actualKeys = Object.keys(queryParams);
   for (const key of actualKeys) {
     if (!allowedKeys.includes(key)) {
@@ -96,6 +96,20 @@ export function validateQueueQuery(queryParams) {
     normalized.hasRedFlags = trimmedFlags === 'true';
   } else {
     normalized.hasRedFlags = null;
+  }
+
+  // Validate sortBy (optional)
+  if (queryParams.sortBy !== undefined && queryParams.sortBy !== null) {
+    if (typeof queryParams.sortBy !== 'string') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'Parameter "sortBy" must be a string');
+    }
+    const trimmedSort = queryParams.sortBy.trim();
+    if (trimmedSort !== 'priority' && trimmedSort !== 'time') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'Parameter "sortBy" must be "priority" or "time"');
+    }
+    normalized.sortBy = trimmedSort;
+  } else {
+    normalized.sortBy = 'time';
   }
 
   return normalized;
