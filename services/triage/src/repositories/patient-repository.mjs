@@ -209,3 +209,116 @@ export async function updatePatientStatus(docClient, tableName, patientId, { new
     throw new ApiError('DATABASE_ERROR', 500, `Database update failed: ${err.message}`, err);
   }
 }
+
+/**
+ * Counts the number of active WAITING patients checked in before the current patient on the same date.
+ * Uses GSI1 index with key range condition.
+ *
+ * @param {object} docClient - DynamoDBDocumentClient instance
+ * @param {string} tableName - DynamoDB table name
+ * @param {string} indexName - GSI index name
+ * @param {object} params
+ * @param {string} params.dateStr - Date string YYYY-MM-DD
+ * @param {string} params.createdAt - ISO timestamp of the patient's check-in
+ * @param {string} params.patientId - UUID of the patient
+ * @returns {Promise<number>} Count of people ahead
+ * @throws {ApiError}
+ */
+export async function countPeopleAhead(docClient, tableName, indexName, { dateStr, createdAt, patientId }) {
+  if (!tableName || tableName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database table name configuration is missing');
+  }
+  if (!indexName || indexName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database queue index configuration is missing');
+  }
+
+  let count = 0;
+  let exclusiveStartKey = null;
+  const pk = `QUEUE#${dateStr}`;
+  const skLimit = `${createdAt}#${patientId}`;
+
+  try {
+    do {
+      const params = {
+        TableName: tableName,
+        IndexName: indexName,
+        KeyConditionExpression: 'gsi1pk = :pk AND gsi1sk < :skLimit',
+        FilterExpression: '#status = :statusVal',
+        ExpressionAttributeNames: {
+          '#status': 'status'
+        },
+        ExpressionAttributeValues: {
+          ':pk': pk,
+          ':skLimit': skLimit,
+          ':statusVal': 'WAITING'
+        },
+        Select: 'COUNT'
+      };
+
+      if (exclusiveStartKey) {
+        params.ExclusiveStartKey = exclusiveStartKey;
+      }
+
+      const response = await docClient.send(new QueryCommand(params));
+      count += response.Count || 0;
+      exclusiveStartKey = response.LastEvaluatedKey || null;
+    } while (exclusiveStartKey);
+
+    return count;
+  } catch (err) {
+    throw new ApiError('DATABASE_ERROR', 500, `Database count query failed: ${err.message}`, err);
+  }
+}
+
+/**
+ * Retrieves all check-in records for a given date from GSI1 to compute statistics.
+ *
+ * @param {object} docClient - DynamoDBDocumentClient instance
+ * @param {string} tableName - DynamoDB table name
+ * @param {string} indexName - GSI index name
+ * @param {string} dateStr - Date string YYYY-MM-DD
+ * @returns {Promise<Array>} List of patients
+ * @throws {ApiError}
+ */
+export async function queryAllPatientsForDate(docClient, tableName, indexName, dateStr) {
+  if (!tableName || tableName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database table name configuration is missing');
+  }
+  if (!indexName || indexName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database queue index configuration is missing');
+  }
+
+  const items = [];
+  let exclusiveStartKey = null;
+
+  try {
+    do {
+      const params = {
+        TableName: tableName,
+        IndexName: indexName,
+        KeyConditionExpression: 'gsi1pk = :pk',
+        ExpressionAttributeValues: {
+          ':pk': `QUEUE#${dateStr}`
+        },
+        ExpressionAttributeNames: {
+          '#status': 'status'
+        },
+        ProjectionExpression: 'patientId, queueNumber, #status, aiAssessment, staffDecision, createdAt, updatedAt, entityType'
+      };
+
+      if (exclusiveStartKey) {
+        params.ExclusiveStartKey = exclusiveStartKey;
+      }
+
+      const response = await docClient.send(new QueryCommand(params));
+      if (response.Items) {
+        items.push(...response.Items);
+      }
+      exclusiveStartKey = response.LastEvaluatedKey || null;
+    } while (exclusiveStartKey);
+
+    return items;
+  } catch (err) {
+    throw new ApiError('DATABASE_ERROR', 500, `Database query failed: ${err.message}`, err);
+  }
+}

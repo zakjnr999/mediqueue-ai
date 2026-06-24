@@ -81,6 +81,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
         reason: 'concerning symptoms',
         requiresImmediateStaffReview: true
       },
+      peopleAhead: 0,
+      estimatedWaitTimeMinutes: 0,
       createdAt: '2026-06-23T14:30:00.000Z'
     });
     // Confirm sensitive fields are absent when not provided
@@ -128,6 +130,31 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
     // Verify sex and selfAssessedUrgency appear in the check-in response
     assert.equal(response.sex, 'Male');
     assert.equal(response.selfAssessedUrgency, 'Urgent');
+  });
+
+  await t.test('1c. Check-in with countPeopleAheadFn calculates wait time and peopleAhead correctly', async () => {
+    let countPeopleAheadCalled = false;
+    const deps = {
+      analyseSymptomsFn: async () => ({
+        summary: 'cough', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false
+      }),
+      generateQueueNumberFn: async () => 'MQ-20260623-0007',
+      savePatientFn: async () => {},
+      countPeopleAheadFn: async (dateStr, createdAt, patientId) => {
+        countPeopleAheadCalled = true;
+        assert.equal(dateStr, '2026-06-23');
+        assert.equal(createdAt, '2026-06-23T14:30:00.000Z');
+        assert.equal(patientId, 'mock-uuid-1234');
+        return 3;
+      },
+      generateIdFn: fixedId,
+      nowFn: fixedNow
+    };
+
+    const response = await createCheckinService(validRequest, deps);
+    assert.ok(countPeopleAheadCalled);
+    assert.equal(response.peopleAhead, 3);
+    assert.equal(response.estimatedWaitTimeMinutes, 15);
   });
 
   await t.test('2. Missing or empty fields in request throws validation error', () => {
@@ -371,6 +398,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
         reason: 'ok',
         requiresImmediateStaffReview: false
       },
+      peopleAhead: 0,
+      estimatedWaitTimeMinutes: 0,
       createdAt: '2026-06-23T14:30:00.000Z'
     });
 

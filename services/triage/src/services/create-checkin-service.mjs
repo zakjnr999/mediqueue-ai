@@ -21,7 +21,8 @@ export async function createCheckinService(rawRequest, deps = {}) {
     generateQueueNumberFn,
     savePatientFn,
     generateIdFn,
-    nowFn
+    nowFn,
+    countPeopleAheadFn
   } = deps;
 
   if (!analyseSymptomsFn || !generateQueueNumberFn || !savePatientFn) {
@@ -124,12 +125,23 @@ export async function createCheckinService(rawRequest, deps = {}) {
     throw err;
   }
 
+  // Calculate people ahead and estimated wait time
+  let peopleAhead = 0;
+  let estimatedWaitTimeMinutes = 0;
+  if (countPeopleAheadFn) {
+    peopleAhead = await countPeopleAheadFn(queueDate, nowIso, patientId);
+    const multiplier = process.env.AVERAGE_WAIT_TIME_MULTIPLIER ? parseInt(process.env.AVERAGE_WAIT_TIME_MULTIPLIER, 10) : 5;
+    estimatedWaitTimeMinutes = peopleAhead * multiplier;
+  }
+
   // 8. Return response payload
   const response = {
     patientId: patientId,
     queueNumber: queueNumber,
     status: 'WAITING',
     aiAssessment: item.aiAssessment,
+    peopleAhead,
+    estimatedWaitTimeMinutes,
     createdAt: nowIso
   };
 

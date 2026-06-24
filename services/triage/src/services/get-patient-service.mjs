@@ -11,7 +11,7 @@ import { ApiError } from '../errors/api-error.mjs';
  * @throws {ApiError}
  */
 export async function getPatientService(patientId, deps = {}) {
-  const { getPatientDetailsFn } = deps;
+  const { getPatientDetailsFn, countPeopleAheadFn } = deps;
 
   if (!getPatientDetailsFn) {
     throw new ApiError('INTERNAL_ERROR', 500, 'Required operations not injected into service');
@@ -76,6 +76,20 @@ export async function getPatientService(patientId, deps = {}) {
   if (item.selfAssessedUrgency !== undefined && item.selfAssessedUrgency !== null) {
     payload.selfAssessedUrgency = item.selfAssessedUrgency;
   }
+
+  // Calculate wait times and people ahead
+  let peopleAhead = 0;
+  let estimatedWaitTimeMinutes = 0;
+
+  if (payload.status === 'WAITING' && countPeopleAheadFn) {
+    const queueDate = item.queueDate || (item.createdAt ? item.createdAt.slice(0, 10) : '');
+    peopleAhead = await countPeopleAheadFn(queueDate, item.createdAt || '', item.patientId || '');
+    const multiplier = process.env.AVERAGE_WAIT_TIME_MULTIPLIER ? parseInt(process.env.AVERAGE_WAIT_TIME_MULTIPLIER, 10) : 5;
+    estimatedWaitTimeMinutes = peopleAhead * multiplier;
+  }
+
+  payload.peopleAhead = peopleAhead;
+  payload.estimatedWaitTimeMinutes = estimatedWaitTimeMinutes;
 
   return payload;
 }

@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { createCheckinService } from '../services/create-checkin-service.mjs';
 import { analyseSymptoms } from '../bedrock/analyse-symptoms.mjs';
 import { generateQueueNumber } from '../queue/generate-queue-number.mjs';
-import { savePatientCheckin } from '../repositories/patient-repository.mjs';
+import { savePatientCheckin, countPeopleAhead } from '../repositories/patient-repository.mjs';
 import { CheckinError } from '../errors/checkin-error.mjs';
 import { apiResponse } from '../responses/api-response.mjs';
 
@@ -47,6 +47,7 @@ export async function handler(event, injectedDeps = null) {
     }
 
     const tableName = process.env.PATIENTS_TABLE_NAME;
+    const indexName = process.env.PATIENTS_QUEUE_INDEX_NAME;
 
     const client = injectedDeps ? null : getDocClient();
     const deps = injectedDeps || {
@@ -63,6 +64,9 @@ export async function handler(event, injectedDeps = null) {
       savePatientFn: async (item) => {
         await savePatientCheckin(client, tableName, item);
         console.log(`Patient record stored: ${item.patientId}`);
+      },
+      countPeopleAheadFn: async (dateStr, createdAt, patientId) => {
+        return await countPeopleAhead(client, tableName, indexName, { dateStr, createdAt, patientId });
       },
       generateIdFn: () => crypto.randomUUID(),
       nowFn: () => new Date()

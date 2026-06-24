@@ -1,7 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { getPatientService } from '../services/get-patient-service.mjs';
-import { getPatientDetails, countPeopleAhead } from '../repositories/patient-repository.mjs';
+import { getStatsService } from '../services/get-stats-service.mjs';
+import { queryAllPatientsForDate } from '../repositories/patient-repository.mjs';
 import { ApiError } from '../errors/api-error.mjs';
 import { apiResponse } from '../responses/api-response.mjs';
 
@@ -22,39 +22,37 @@ function getDocClient() {
 }
 
 /**
- * AWS Lambda Handler for GET /patients/{patientId}.
+ * AWS Lambda Handler for GET /queue/stats.
  * 
  * @param {object} event - API Gateway Proxy Event
  * @param {object} [injectedDeps] - Optional injected dependencies for testing
  * @returns {Promise<object>} API Gateway Proxy Response
  */
 export async function handler(event, injectedDeps = null) {
-  console.log('Patient details request received');
+  console.log('Stats request received');
 
   try {
     const tableName = process.env.PATIENTS_TABLE_NAME;
     const indexName = process.env.PATIENTS_QUEUE_INDEX_NAME;
 
-    // Validate table and GSI configuration early
+    // Validate table/index configuration early
     if (!tableName || tableName.trim() === '' || !indexName || indexName.trim() === '') {
       throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
     }
 
-    const patientId = event?.pathParameters?.patientId;
+    const queryParams = event?.queryStringParameters || {};
 
     const client = injectedDeps ? null : getDocClient();
     const deps = injectedDeps || {
-      getPatientDetailsFn: async (id) => {
-        const item = await getPatientDetails(client, tableName, id);
-        console.log(`Patient record retrieved: ${id}`);
-        return item;
+      queryAllPatientsForDateFn: async (dateStr) => {
+        const results = await queryAllPatientsForDate(client, tableName, indexName, dateStr);
+        console.log('Patients retrieved for stats');
+        return results;
       },
-      countPeopleAheadFn: async (dateStr, createdAt, patientId) => {
-        return await countPeopleAhead(client, tableName, indexName, { dateStr, createdAt, patientId });
-      }
+      nowFn: () => new Date()
     };
 
-    const result = await getPatientService(patientId, deps);
+    const result = await getStatsService(queryParams, deps);
 
     return apiResponse(200, {
       success: true,
