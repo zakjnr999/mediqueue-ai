@@ -25,7 +25,7 @@ graph TD
     CO -.->|Access Token JWT| S
     AG -->|Authorized Requests| L
     L -->|1. Store Patient Data with PHI| DB
-    L -->|2. Invoke Triage (PII Stripped)| B
+    L -->|"2. Invoke Triage (PII Stripped)"| B
     B -->|3. Suggested Priority & Summary| L
     L -->|4. Update Assessment Details| DB
     L -.->|Logs & Performance metrics| CW
