@@ -4,13 +4,31 @@ This folder contains the technical architecture and system-design documentation 
 
 ## Core System Flow
 
-```text
-Patient Web Interface
-→ Amazon API Gateway
-→ AWS Lambda
-→ Amazon Bedrock
-→ Amazon DynamoDB
-→ Staff Web Dashboard
+```mermaid
+graph TD
+    classDef client fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef aws fill:#080d16,stroke:#0d9488,stroke-width:2px,color:#f3f4f6;
+    classDef data fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#f3f4f6;
+
+    P[Patient Web Portal]:::client
+    S[Staff Web Dashboard]:::client
+    AG[Amazon API Gateway]:::aws
+    CO[Amazon Cognito]:::aws
+    L[AWS Lambda Triage Handler]:::aws
+    B[Amazon Bedrock AI]:::aws
+    DB[(Amazon DynamoDB)]:::data
+    CW[Amazon CloudWatch]:::aws
+
+    P -->|Digital Check-in / Status| AG
+    S -->|Triage Review / Priority Update| AG
+    S -.->|Authentication Request| CO
+    CO -.->|Access Token JWT| S
+    AG -->|Authorized Requests| L
+    L -->|1. Store Patient Data with PHI| DB
+    L -->|2. Invoke Triage (PII Stripped)| B
+    B -->|3. Suggested Priority & Summary| L
+    L -->|4. Update Assessment Details| DB
+    L -.->|Logs & Performance metrics| CW
 ```
 
 ## Main Components
@@ -108,16 +126,13 @@ Stores logs and helps the team monitor:
 * Waiting time should also be considered to prevent queue starvation.
 * True emergency cases should be escalated immediately.
 
-## Architecture Documents to Store Here
+## System Architecture Documents
 
-This folder may contain:
-
-* `architecture-diagram.png`
-* `data-flow-diagram.png`
-* `database-design.md`
-* `aws-services.md`
-* `security-notes.md`
-* `queue-logic.md`
+* **[Architecture Diagram Image](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/architecture-diagram.png)**: Visual AWS serverless service diagram.
+* **[AWS Services Architecture](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/aws-services.md)**: Cloud service mapping and handlers description.
+* **[Database Design](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/database-design.md)**: Single-table schema partition keys and GSI index configuration.
+* **[Queue & Triage Logic](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/queue-logic.md)**: Triage rules, priorities, overrides, and lifecycle transitions.
+* **[Security & HIPAA Compliance Notes](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/security-notes.md)**: HIPAA PII isolation, Cognito user authentication, and RBAC rules.
 
 ## Architecture Rules
 
