@@ -23,77 +23,111 @@ function getDocClient() {
 }
 
 /**
- * AWS Lambda Handler for PATCH /patients/{patientId}/priority.
+ * Factory function to create PATCH /patients/{patientId}/priority Lambda handler.
  * 
- * @param {object} event - API Gateway Proxy Event
- * @param {object} [injectedDeps] - Optional injected dependencies for testing
- * @returns {Promise<object>} API Gateway Proxy Response
+ * @param {object} dependencies - Injected dependencies
+ * @returns {Function} AWS Lambda handler
  */
-export async function handler(event, injectedDeps = null) {
-  console.log('Priority review request received');
-
-  try {
-    requireAuthentication(event);
-
-    const tableName = process.env.PATIENTS_TABLE_NAME;
-
-    // Validate table configuration early
-    if (!tableName || tableName.trim() === '') {
-      throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+export function createHandler(dependencies) {
+  if (!dependencies || typeof dependencies !== 'object') {
+    throw new Error('Dependencies object is required');
+  }
+  if (typeof dependencies.serviceFn !== 'function') {
+    throw new Error('Dependency "serviceFn" must be a function');
+  }
+  if (dependencies.getDocClientFn !== undefined && typeof dependencies.getDocClientFn !== 'function') {
+    throw new Error('Dependency "getDocClientFn" must be a function');
+  }
+  if (dependencies.getDocClientFn) {
+    const required = ['getPatientDetailsFn', 'updatePatientPriorityFn', 'nowFn'];
+    for (const name of required) {
+      if (typeof dependencies[name] !== 'function') {
+        throw new Error(`Dependency "${name}" must be a function`);
+      }
     }
+  }
 
-    if (!event || event.body === undefined || event.body === null) {
-      throw new ApiError('INVALID_JSON', 400, 'Request body is missing');
-    }
+  return async function handleRequest(event, context) {
+    console.log('Priority review request received');
 
-    let parsedBody;
     try {
-      parsedBody = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+      requireAuthentication(event);
+
+      const tableName = process.env.PATIENTS_TABLE_NAME;
+
+      // Validate table configuration early
+      if (!tableName || tableName.trim() === '') {
+        throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+      }
+
+      if (!event || event.body === undefined || event.body === null) {
+        throw new ApiError('INVALID_JSON', 400, 'Request body is missing');
+      }
+
+      let parsedBody;
+      try {
+        parsedBody = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+      } catch (err) {
+        throw new ApiError('INVALID_JSON', 400, 'Request body is not valid JSON', err);
+      }
+
+      const patientId = event?.pathParameters?.patientId;
+
+      const client = dependencies.getDocClientFn ? dependencies.getDocClientFn() : null;
+      const deps = {
+        getPatientDetailsFn: dependencies.getPatientDetailsFn || (dependencies.getDocClientFn ? (async (id) => {
+          return await getPatientDetails(client, tableName, id);
+        }) : null),
+        updatePatientPriorityFn: dependencies.updatePatientPriorityFn || (dependencies.getDocClientFn ? (async (id, params) => {
+          const updated = await updatePatientPriority(client, tableName, id, params);
+          console.log('Staff priority saved');
+          return updated;
+        }) : null),
+        nowFn: dependencies.nowFn || (() => new Date())
+      };
+
+      const serviceFn = dependencies.serviceFn;
+      const result = await serviceFn(patientId, parsedBody, deps);
+
+      return apiResponse(200, {
+        success: true,
+        data: result
+      });
     } catch (err) {
-      throw new ApiError('INVALID_JSON', 400, 'Request body is not valid JSON', err);
-    }
+      if (err instanceof ApiError) {
+        console.warn("Request failed", {
+          code: err.code,
+          requestId: context?.awsRequestId,
+        });
+        return apiResponse(err.statusCode, {
+          success: false,
+          error: {
+            code: err.code,
+            message: err.message
+          }
+        });
+      }
 
-    const patientId = event?.pathParameters?.patientId;
-
-    const client = injectedDeps ? null : getDocClient();
-    const deps = injectedDeps || {
-      getPatientDetailsFn: async (id) => {
-        return await getPatientDetails(client, tableName, id);
-      },
-      updatePatientPriorityFn: async (id, params) => {
-        const updated = await updatePatientPriority(client, tableName, id, params);
-        console.log('Staff priority saved');
-        return updated;
-      },
-      nowFn: () => new Date()
-    };
-
-    const result = await updatePriorityService(patientId, parsedBody, deps);
-
-    return apiResponse(200, {
-      success: true,
-      data: result
-    });
-  } catch (err) {
-    if (err instanceof ApiError) {
-      console.warn('Request failed', { code: err.code });
-      return apiResponse(err.statusCode, {
+      console.error("Unhandled server error", {
+        requestId: context?.awsRequestId,
+      });
+      return apiResponse(500, {
         success: false,
         error: {
-          code: err.code,
-          message: err.message
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected internal error occurred'
         }
       });
     }
-
-    // Secure logging - no raw error, cause, stack trace, or payload leaks
-    console.error('Unhandled server error');
-    return apiResponse(500, {
-      success: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'An unexpected internal error occurred'
-      }
-    });
-  }
+  };
 }
+
+const prodDeps = Object.freeze({
+  serviceFn: updatePriorityService,
+  getDocClientFn: getDocClient,
+  getPatientDetailsFn: getPatientDetails,
+  updatePatientPriorityFn: updatePatientPriority,
+  nowFn: () => new Date()
+});
+
+export const handler = createHandler(prodDeps);

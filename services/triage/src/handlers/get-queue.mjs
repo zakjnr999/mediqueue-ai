@@ -24,65 +24,102 @@ function getDocClient() {
 }
 
 /**
- * AWS Lambda Handler for GET /queue.
+ * Factory function to create GET /queue Lambda handler.
  * 
- * @param {object} event - API Gateway Proxy Event
- * @param {object} [injectedDeps] - Optional injected dependencies for testing
- * @returns {Promise<object>} API Gateway Proxy Response
+ * @param {object} dependencies - Injected dependencies
+ * @returns {Function} AWS Lambda handler
  */
-export async function handler(event, injectedDeps = null) {
-  console.log('Queue request received');
-
-  try {
-    requireAuthentication(event);
-
-    const tableName = process.env.PATIENTS_TABLE_NAME;
-    const indexName = process.env.PATIENTS_QUEUE_INDEX_NAME;
-
-    // Validate table/index configuration early
-    if (!tableName || tableName.trim() === '' || !indexName || indexName.trim() === '') {
-      throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+export function createHandler(dependencies) {
+  if (!dependencies || typeof dependencies !== 'object') {
+    throw new Error('Dependencies object is required');
+  }
+  if (typeof dependencies.serviceFn !== 'function') {
+    throw new Error('Dependency "serviceFn" must be a function');
+  }
+  if (dependencies.getDocClientFn !== undefined && typeof dependencies.getDocClientFn !== 'function') {
+    throw new Error('Dependency "getDocClientFn" must be a function');
+  }
+  if (dependencies.getDocClientFn) {
+    const required = ['queryPatientQueueFn', 'serializeTokenFn', 'deserializeTokenFn', 'nowFn'];
+    for (const name of required) {
+      if (typeof dependencies[name] !== 'function') {
+        throw new Error(`Dependency "${name}" must be a function`);
+      }
     }
+  }
 
-    const queryParams = event?.queryStringParameters || {};
+  return async function handleRequest(event, context) {
+    console.log('Queue request received');
 
-    const client = injectedDeps ? null : getDocClient();
-    const deps = injectedDeps || {
-      queryPatientQueueFn: async (params) => {
-        const results = await queryPatientQueue(client, tableName, indexName, params);
-        console.log('Queue records retrieved');
-        return results;
-      },
-      serializeTokenFn: serializeToken,
-      deserializeTokenFn: deserializeToken,
-      nowFn: () => new Date()
-    };
+    try {
+      requireAuthentication(event);
 
-    const result = await getQueueService(queryParams, deps);
+      const tableName = process.env.PATIENTS_TABLE_NAME;
+      const indexName = process.env.PATIENTS_QUEUE_INDEX_NAME;
 
-    return apiResponse(200, {
-      success: true,
-      data: result
-    });
-  } catch (err) {
-    if (err instanceof ApiError) {
-      console.warn('Request failed', { code: err.code });
-      return apiResponse(err.statusCode, {
+      // Validate table and index configuration early
+      if (!tableName || tableName.trim() === '' || !indexName || indexName.trim() === '') {
+        throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+      }
+
+      const queryParams = event.queryStringParameters || {};
+      const limit = queryParams.limit ? parseInt(queryParams.limit, 10) : undefined;
+      const startKey = queryParams.startKey ? queryParams.startKey : undefined;
+      const sortBy = queryParams.sortBy ? queryParams.sortBy : undefined;
+
+      const client = dependencies.getDocClientFn ? dependencies.getDocClientFn() : null;
+      const deps = {
+        queryPatientQueueFn: dependencies.queryPatientQueueFn || (dependencies.getDocClientFn ? (async (dateStr, limit, startKey) => {
+          return await queryPatientQueue(client, tableName, indexName, dateStr, limit, startKey);
+        }) : null),
+        serializeTokenFn: dependencies.serializeTokenFn || serializeToken,
+        deserializeTokenFn: dependencies.deserializeTokenFn || deserializeToken,
+        nowFn: dependencies.nowFn || (() => new Date())
+      };
+
+      const serviceFn = dependencies.serviceFn;
+      const result = await serviceFn(queryParams, deps);
+
+      return apiResponse(200, {
+        success: true,
+        data: result
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        console.warn("Request failed", {
+          code: err.code,
+          requestId: context?.awsRequestId,
+        });
+        return apiResponse(err.statusCode, {
+          success: false,
+          error: {
+            code: err.code,
+            message: err.message
+          }
+        });
+      }
+
+      console.error("Unhandled server error", {
+        requestId: context?.awsRequestId,
+      });
+      return apiResponse(500, {
         success: false,
         error: {
-          code: err.code,
-          message: err.message
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected internal error occurred'
         }
       });
     }
-
-    console.error('Unhandled server error');
-    return apiResponse(500, {
-      success: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'An unexpected internal error occurred'
-      }
-    });
-  }
+  };
 }
+
+const prodDeps = Object.freeze({
+  serviceFn: getQueueService,
+  getDocClientFn: getDocClient,
+  queryPatientQueueFn: queryPatientQueue,
+  serializeTokenFn: serializeToken,
+  deserializeTokenFn: deserializeToken,
+  nowFn: () => new Date()
+});
+
+export const handler = createHandler(prodDeps);

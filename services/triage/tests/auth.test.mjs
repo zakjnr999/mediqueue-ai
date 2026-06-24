@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { validateLoginRequest } from '../src/validation/validate-login-request.mjs';
 import { loginService } from '../src/services/login-service.mjs';
-import { handler as loginHandler } from '../src/handlers/login.mjs';
+import { createHandler, handler as productionHandler } from '../src/handlers/login.mjs';
 import { requireAuthentication } from '../src/middleware/auth-middleware.mjs';
 import { ApiError } from '../src/errors/api-error.mjs';
 
@@ -138,6 +138,7 @@ test('Authentication - Lambda Handler Behaviour', async (t) => {
     process.env.COGNITO_USER_POOL_CLIENT_ID = 'mock-client-id';
 
     const mockDeps = {
+      serviceFn: loginService,
       initiateAuthFn: async () => ({
         AuthenticationResult: {
           AccessToken: 'mock-access',
@@ -152,7 +153,8 @@ test('Authentication - Lambda Handler Behaviour', async (t) => {
       body: JSON.stringify({ email: 'staff@hospital.com', password: 'password' })
     };
 
-    const res = await loginHandler(event, mockDeps);
+    const loginHandler = createHandler(mockDeps);
+    const res = await loginHandler(event);
     assert.equal(res.statusCode, 200);
 
     const body = JSON.parse(res.body);
@@ -167,7 +169,11 @@ test('Authentication - Lambda Handler Behaviour', async (t) => {
       body: JSON.stringify({ email: 'staff@hospital.com', password: 'password' })
     };
 
-    const res = await loginHandler(event, {});
+    const loginHandler = createHandler({
+      serviceFn: loginService,
+      initiateAuthFn: async () => ({})
+    });
+    const res = await loginHandler(event);
     assert.equal(res.statusCode, 500);
 
     const body = JSON.parse(res.body);

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { validateStatsQuery } from '../src/validation/validate-stats-query.mjs';
 import { getStatsService } from '../src/services/get-stats-service.mjs';
-import { handler } from '../src/handlers/get-stats.mjs';
+import { createHandler, handler as productionHandler } from '../src/handlers/get-stats.mjs';
 import { ApiError } from '../src/errors/api-error.mjs';
 
 test('Queue Stats - Validation Tests', async (t) => {
@@ -119,6 +119,7 @@ test('Queue Stats - Handler Behaviour', async (t) => {
     process.env.PATIENTS_QUEUE_INDEX_NAME = 'TestIndex';
 
     const mockDeps = {
+      serviceFn: getStatsService,
       queryAllPatientsForDateFn: async () => [
         {
           entityType: 'PATIENT_CHECKIN',
@@ -129,7 +130,8 @@ test('Queue Stats - Handler Behaviour', async (t) => {
       ]
     };
 
-    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: { date: '2026-06-24' } }, mockDeps);
+    const handler = createHandler(mockDeps);
+    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: { date: '2026-06-24' } });
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
 
@@ -148,6 +150,7 @@ test('Queue Stats - Handler Behaviour', async (t) => {
     delete process.env.PATIENTS_TABLE_NAME;
     delete process.env.PATIENTS_QUEUE_INDEX_NAME;
 
+    const handler = createHandler({ serviceFn: getStatsService });
     const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: {} });
     assert.equal(res.statusCode, 500);
 
@@ -161,12 +164,14 @@ test('Queue Stats - Handler Behaviour', async (t) => {
     process.env.PATIENTS_QUEUE_INDEX_NAME = 'TestIndex';
 
     const mockDeps = {
+      serviceFn: getStatsService,
       queryAllPatientsForDateFn: async () => {
         throw new Error('Database connection string leaked: secretPassword123');
       }
     };
 
-    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: {} }, mockDeps);
+    const handler = createHandler(mockDeps);
+    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: {} });
     assert.equal(res.statusCode, 500);
 
     const body = JSON.parse(res.body);
