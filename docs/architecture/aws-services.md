@@ -34,7 +34,7 @@ MediQueue AI is built on a fully serverless, highly available AWS architecture. 
 ## 2. Service Roles & Configurations
 
 ### 2.1 Amazon Bedrock
-* **Model ID**: `anthropic.claude-3-haiku-20240307-v1:0` (or region-appropriate lightweight model).
+* **Model ID**: `amazon.nova-lite-v1:0` (or region-appropriate lightweight model).
 * **Role**: Evaluates age and symptom tags, performs pattern-matching check for clinical red flags, generates a concise case summary, and suggests a recommended triage priority level.
 * **Region**: `us-west-2` (configured in env setup).
 
