@@ -1,0 +1,6 @@
+{
+  "name": "MediQueue AI",
+  "description": "An AI-powered clinical triage queue and patient check-in system that automatically summarizes symptoms and prioritizes cases to reduce wait times and anxiety.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

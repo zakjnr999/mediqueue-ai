@@ -1,0 +1,19 @@
+{
+  "name": "mediqueue-ai-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev -w frontend\" \"npm run dev -w backend\"",
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "start": "npm run start -w frontend & npm run start -w backend",
+    "lint": "npm run lint -w frontend && npm run lint -w backend",
+    "clean": "npm run clean -w frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
