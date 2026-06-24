@@ -99,6 +99,8 @@ export async function createCheckinService(rawRequest, deps = {}) {
       reviewerDisplayName: null
     },
     status: 'WAITING',
+    isEscalated: false,
+    escalatedBy: null,
     createdAt: nowIso,
     updatedAt: nowIso
   };
@@ -142,6 +144,8 @@ export async function createCheckinService(rawRequest, deps = {}) {
     aiAssessment: item.aiAssessment,
     peopleAhead,
     estimatedWaitTimeMinutes,
+    isEscalated: false,
+    escalatedBy: null,
     createdAt: nowIso
   };
 

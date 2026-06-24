@@ -83,6 +83,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
       },
       peopleAhead: 0,
       estimatedWaitTimeMinutes: 0,
+      isEscalated: false,
+      escalatedBy: null,
       createdAt: '2026-06-23T14:30:00.000Z'
     });
     // Confirm sensitive fields are absent when not provided
@@ -400,6 +402,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
       },
       peopleAhead: 0,
       estimatedWaitTimeMinutes: 0,
+      isEscalated: false,
+      escalatedBy: null,
       createdAt: '2026-06-23T14:30:00.000Z'
     });
 
