@@ -1,0 +1,23 @@
+{
+  "name": "mediqueue-infra",
+  "version": "1.0.0",
+  "description": "MediQueue AWS Infrastructure Definitions",
+  "bin": {
+    "mediqueue-infra": "bin/mediqueue-infra.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "echo \"No tests defined\" && exit 0",
+    "cdk": "cdk"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.138.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

@@ -3,6 +3,7 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { getQueueService } from '../services/get-queue-service.mjs';
 import { queryPatientQueue } from '../repositories/patient-repository.mjs';
 import { serializeToken, deserializeToken } from '../pagination/pagination-token.mjs';
+import { requireAuthentication } from '../middleware/auth-middleware.mjs';
 import { ApiError } from '../errors/api-error.mjs';
 import { apiResponse } from '../responses/api-response.mjs';
 
@@ -33,6 +34,8 @@ export async function handler(event, injectedDeps = null) {
   console.log('Queue request received');
 
   try {
+    requireAuthentication(event);
+
     const tableName = process.env.PATIENTS_TABLE_NAME;
     const indexName = process.env.PATIENTS_QUEUE_INDEX_NAME;
 

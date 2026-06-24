@@ -2,6 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { getStatsService } from '../services/get-stats-service.mjs';
 import { queryAllPatientsForDate } from '../repositories/patient-repository.mjs';
+import { requireAuthentication } from '../middleware/auth-middleware.mjs';
 import { ApiError } from '../errors/api-error.mjs';
 import { apiResponse } from '../responses/api-response.mjs';
 
@@ -32,6 +33,8 @@ export async function handler(event, injectedDeps = null) {
   console.log('Stats request received');
 
   try {
+    requireAuthentication(event);
+
     const tableName = process.env.PATIENTS_TABLE_NAME;
     const indexName = process.env.PATIENTS_QUEUE_INDEX_NAME;
 
