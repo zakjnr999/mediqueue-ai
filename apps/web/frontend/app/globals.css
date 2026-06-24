@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #0F7B5E;
+  --color-brand-light: #E6F7F2;
+  --color-brand-dark: #065C44;
+  --color-surface-white: #FFFFFF;
+  --color-surface-grey: #F7F8FA;
+  --color-surface-border: #E2E6EA;
+  --color-text-primary: #1A202C;
+  --color-text-secondary: #5A6474;
+  --color-text-tertiary: #9AA3AF;
+  
+  --color-urgency-minor-bg: #E6F7F2;
+  --color-urgency-minor-border: #0F7B5E;
+  --color-urgency-minor-text: #065C44;
+  
+  --color-urgency-moderate-bg: #FEF3E2;
+  --color-urgency-moderate-border: #D97706;
+  --color-urgency-moderate-text: #92400E;
+  
+  --color-urgency-urgent-bg: #FEF2F2;
+  --color-urgency-urgent-border: #DC2626;
+  --color-urgency-urgent-text: #991B1B;
+  
+  --color-urgency-progress-bg: #EFF6FF;
+  --color-urgency-progress-border: #2563EB;
+  --color-urgency-progress-text: #1E40AF;
+  
+  --color-urgency-done-bg: #F7F8FA;
+  --color-urgency-done-border: #9AA3AF;
+  --color-urgency-done-text: #5A6474;
+}
+
+body {
+  background-color: var(--color-surface-grey);
+  color: var(--color-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
