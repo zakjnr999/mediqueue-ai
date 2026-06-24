@@ -128,11 +128,11 @@ Stores logs and helps the team monitor:
 
 ## System Architecture Documents
 
-* **[Architecture Diagram Image](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/architecture-diagram.png)**: Visual AWS serverless service diagram.
-* **[AWS Services Architecture](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/aws-services.md)**: Cloud service mapping and handlers description.
-* **[Database Design](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/database-design.md)**: Single-table schema partition keys and GSI index configuration.
-* **[Queue & Triage Logic](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/queue-logic.md)**: Triage rules, priorities, overrides, and lifecycle transitions.
-* **[Security & HIPAA Compliance Notes](file:///c:/Users/richi/Desktop/mediqueue-ai/mediqueue-ai/docs/architecture/security-notes.md)**: HIPAA PII isolation, Cognito user authentication, and RBAC rules.
+* **[Architecture Diagram Image](file:///Users/mac/Developer/Projects/mediqueue-ai/docs/architecture/architecture-diagram.png)**: Visual AWS serverless service diagram.
+* **[AWS Services Architecture](file:///Users/mac/Developer/Projects/mediqueue-ai/docs/architecture/aws-services.md)**: Cloud service mapping and handlers description.
+* **[Database Design](file:///Users/mac/Developer/Projects/mediqueue-ai/docs/architecture/database-design.md)**: Single-table schema partition keys and GSI index configuration.
+* **[Queue & Triage Logic](file:///Users/mac/Developer/Projects/mediqueue-ai/docs/architecture/queue-logic.md)**: Triage rules, priorities, overrides, and lifecycle transitions.
+* **[Security & HIPAA Compliance Notes](file:///Users/mac/Developer/Projects/mediqueue-ai/docs/architecture/security-notes.md)**: HIPAA PII isolation, Cognito user authentication, and RBAC rules.
 
 ## Architecture Rules
 

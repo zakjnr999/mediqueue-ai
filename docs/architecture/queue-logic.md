@@ -20,7 +20,7 @@ Triage priorities are defined by three desaturated alert categories:
 
 The staff dashboard displays patient queue lists sorted using the following precedence:
 
-1. **Escalation Flag**: Patients with `escalated = true` are always pinned to the top of the queue list, sorted chronologically among themselves.
+1. **Escalation Flag**: Patients with `isEscalated = true` are always pinned to the top of the queue list, sorted chronologically among themselves.
 2. **Priority Level**: HIGH priority patients are listed below escalated ones, followed by MEDIUM, and then LOW.
 3. **Chronological check-in time**: Within each priority class, patients are sorted ascending by `createdAt` timestamp (oldest first) to ensure fair treatment.
 
@@ -58,5 +58,5 @@ Patient queue statuses transition strictly forward along a clinical path:
 
 ### 4.3 Escalation State
 * If a patient's condition worsens in the waiting room, staff can click the **Escalate now** action.
-* This updates `escalated` to `true` and saves the name of the operator.
+* This updates `isEscalated` to `true` and saves the name of the operator.
 * Triggering escalation displays a high-visibility crimson banner `🚨 ESCALATED — IMMEDIATE ATTENTION REQUIRED` on the dashboard, alerting the team to respond immediately.

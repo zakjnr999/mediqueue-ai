@@ -6,31 +6,33 @@ MediQueue AI uses Amazon DynamoDB as its primary, highly scalable, serverless da
 
 ## 1. Primary Table Schema (`PatientsTable`)
 
-The database uses a single-table design format with partition and sort keys to manage patient records and sequence sequences.
+The database uses a single-table design format with a simple partition key to manage patient records and sequence sequences.
 
-* **Partition Key (`PK`)**: `patientId` (String, UUID v4 format)
-* **Sort Key (`SK`)**: `recordType` (String)
-  * Patient check-in records use `PATIENT_CHECKIN`.
-  * The daily check-in counter uses `DAILY_COUNTER`.
+* **Primary Partition Key (`id`)**: String (e.g. `PATIENT#<patientId>` or `COUNTER#<dateStr>`)
+* **Sort Key**: None (utilizes a simple primary key structure)
 
 ### Attribute Map - Patient Record (`PATIENT_CHECKIN`)
 
 | Attribute | Type | Description |
 | :--- | :--- | :--- |
+| `id` | String | Partition key (e.g. `PATIENT#<patientId>`). |
+| `entityType` | String | Hardcoded to `PATIENT_CHECKIN`. |
 | `patientId` | String | Unique UUID v4 for the check-in session. |
 | `queueNumber` | String | Structured chronological ticket ID (e.g. `MQ-20260624-0017`). |
 | `fullName` | String | Patient's full name (kept encrypted/unshared with AI). |
 | `phoneNumber` | String | Patient's phone number (kept encrypted/unshared with AI). |
-| `sex` | String | Patient's gender: `MALE`, `FEMALE`, or `PREFER_NOT_TO_SAY`. |
+| `sex` | String | Patient's gender: `Male`, `Female`, or `Prefer not to say`. |
 | `age` | Number | Patient's age in years. |
 | `symptoms` | List (Strings) | Selected symptom tags. |
-| `selfAssessedUrgency` | String | Patient's self-assessment: `MINOR`, `MODERATE`, or `URGENT`. |
+| `selfAssessedUrgency` | String | Patient's self-assessment: `Minor`, `Moderate`, or `Urgent`. |
 | `additionalDetails` | String | Patient-entered text description (stripped of PII before AI processing). |
 | `status` | String | Queue status: `WAITING`, `IN_PROGRESS`, or `COMPLETED`. |
 | `aiAssessment` | Map | Bedrock-generated summary, red flags list, suggested priority, reasoning, and review flags. |
 | `staffDecision` | Map | Staff-confirmed priority, reviewedAt timestamp, and overrideReason comments. |
-| `escalated` | Boolean | Triage nurse escalation indicator flag. |
+| `isEscalated` | Boolean | Triage nurse escalation indicator flag. |
 | `escalatedBy` | String | Coordinator username who escalated the record. |
+| `gsi1pk` | String | GSI partition reference key (e.g. `QUEUE#YYYY-MM-DD`). |
+| `gsi1sk` | String | GSI sort reference key (e.g. `2026-06-24T00:00:00.000Z#<uuid>`). |
 | `createdAt` | String | ISO 8601 creation timestamp. |
 | `updatedAt` | String | ISO 8601 modification timestamp (used for conditional updates). |
 
@@ -38,9 +40,10 @@ The database uses a single-table design format with partition and sort keys to m
 
 | Attribute | Type | Description |
 | :--- | :--- | :--- |
-| `PK` | String | Static ID representing the date (e.g. `COUNTER#20260624`). |
-| `SK` | String | `DAILY_COUNTER`. |
+| `id` | String | Partition key (e.g. `COUNTER#20260624`). |
+| `entityType` | String | Hardcoded to `DAILY_COUNTER`. |
 | `currentValue` | Number | Integer counter used to generate chronological sequence suffix. |
+| `updatedAt` | String | ISO 8601 modification timestamp. |
 
 ---
 
@@ -48,13 +51,13 @@ The database uses a single-table design format with partition and sort keys to m
 
 To enable efficient query lists for the staff dashboard, a GSI is configured to project queue records filtered by status and chronological order.
 
-### `QueueIndex`
+### `QueueIndex` (e.g. `gsi1`)
 
-* **Partition Key (`GSI_PK`)**: `checkinDate` (String format: `YYYY-MM-DD`)
-* **Sort Key (`GSI_SK`)**: `createdAt` (String ISO 8601 timestamp)
-* **Projection**: `KEYS_ONLY` or selected attributes:
-  * Projected attributes: `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment` (summarized attributes only), `staffDecision.confirmedPriority`, `escalated`, `createdAt`.
-  * Excluded attributes to save throughput: full `symptoms` lists, `phoneNumber` credentials, `additionalDetails` descriptions.
+* **Partition Key (`gsi1pk`)**: `QUEUE#YYYY-MM-DD` (String format)
+* **Sort Key (`gsi1sk`)**: `createdAt#patientId` (String format, e.g. `2026-06-24T00:00:00.000Z#<uuid>`)
+* **Projection**: `INCLUDE`
+  * Projected attributes: `entityType`, `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment`, `staffDecision`, `createdAt`, `isEscalated`, `escalatedBy`.
+  * Excluded attributes to save throughput: full `symptoms` lists, `phoneNumber` credentials, `additionalDetails` descriptions, `sex`, and `selfAssessedUrgency`.
 
 ---
 
