@@ -98,6 +98,8 @@ export async function getQueueService(queryParams, deps = {}) {
         fullName: item.fullName || '',
         age: typeof item.age === 'number' ? item.age : 0,
         status: item.status || 'WAITING',
+        isEscalated: typeof item.isEscalated === 'boolean' ? item.isEscalated : false,
+        escalatedBy: item.escalatedBy !== undefined ? item.escalatedBy : null,
         aiAssessment,
         staffDecision,
         createdAt: item.createdAt || ''

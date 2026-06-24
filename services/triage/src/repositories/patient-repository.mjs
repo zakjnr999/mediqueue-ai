@@ -63,7 +63,7 @@ export async function queryPatientQueue(docClient, tableName, indexName, { dateS
         '#status': 'status'
       },
       // Restrict projected fields to avoid returning unapproved items or sensitive data
-      ProjectionExpression: 'patientId, queueNumber, fullName, age, #status, aiAssessment, staffDecision, createdAt, entityType',
+      ProjectionExpression: 'patientId, queueNumber, fullName, age, #status, aiAssessment, staffDecision, createdAt, entityType, isEscalated, escalatedBy',
       ScanIndexForward: true, // ASC order (first-come, first-served)
       Limit: limit
     };
@@ -320,5 +320,59 @@ export async function queryAllPatientsForDate(docClient, tableName, indexName, d
     return items;
   } catch (err) {
     throw new ApiError('DATABASE_ERROR', 500, `Database query failed: ${err.message}`, err);
+  }
+}
+
+/**
+ * Escalates a patient record by setting isEscalated = true and updating staffDecision attributes.
+ * Conditional on record existence, status = 'WAITING', and version check (updatedAt = expectedUpdatedAt).
+ *
+ * @param {object} docClient - DynamoDBDocumentClient instance
+ * @param {string} tableName - DynamoDB table name
+ * @param {string} patientId - UUID
+ * @param {object} params
+ * @param {string} params.reviewerDisplayName - Name of staff member
+ * @param {string} params.reviewedAt - ISO timestamp
+ * @param {string} params.expectedUpdatedAt - Expect stored updatedAt to match this
+ * @param {string} params.updatedAt - ISO timestamp
+ * @returns {Promise<object>} Updated patient record attributes
+ * @throws {ApiError}
+ */
+export async function escalatePatient(docClient, tableName, patientId, { reviewerDisplayName, reviewedAt, expectedUpdatedAt, updatedAt }) {
+  if (!tableName || tableName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database table name configuration is missing');
+  }
+
+  try {
+    const response = await docClient.send(new UpdateCommand({
+      TableName: tableName,
+      Key: {
+        id: `PATIENT#${patientId}`
+      },
+      UpdateExpression: 'SET isEscalated = :ie, escalatedBy = :eb, staffDecision.confirmedPriority = :cp, staffDecision.reviewedAt = :ra, staffDecision.reviewerDisplayName = :rd, #updatedAt = :ua',
+      ConditionExpression: 'attribute_exists(id) AND entityType = :checkinEntityType AND #updatedAt = :expectedUpdatedAt AND #status = :expectedStatus',
+      ExpressionAttributeNames: {
+        '#updatedAt': 'updatedAt',
+        '#status': 'status'
+      },
+      ExpressionAttributeValues: {
+        ':ie': true,
+        ':eb': reviewerDisplayName,
+        ':cp': 'HIGH',
+        ':ra': reviewedAt,
+        ':rd': reviewerDisplayName,
+        ':ua': updatedAt,
+        ':checkinEntityType': 'PATIENT_CHECKIN',
+        ':expectedUpdatedAt': expectedUpdatedAt,
+        ':expectedStatus': 'WAITING'
+      },
+      ReturnValues: 'ALL_NEW'
+    }));
+    return response.Attributes;
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      throw new ApiError('UPDATE_CONFLICT', 409, 'The patient record status or version changed. Please reload and try again.', err);
+    }
+    throw new ApiError('DATABASE_ERROR', 500, `Database update failed: ${err.message}`, err);
   }
 }

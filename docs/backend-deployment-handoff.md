@@ -16,6 +16,7 @@ All handlers are configured as **ES modules (`.mjs`)** and expose a standard asy
 | **PATCH** | `/patients/{patientId}/priority` | `services/triage/src/handlers/update-priority.mjs` | `handler` | Saves staff confirmed priority and override reasons, protected by concurrency timestamp validations. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
 | **PATCH** | `/patients/{patientId}/status` | `services/triage/src/handlers/update-status.mjs` | `handler` | Updates queue status forward-only (`WAITING → IN_PROGRESS → COMPLETED`), protected by race-condition checks. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
 | **GET** | `/queue/stats` | `services/triage/src/handlers/get-stats.mjs` | `handler` | Computes today's wait queue statistics (inQueue, avgWaitTimeMinutes, redFlags, seenToday). | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
+| **POST** | `/patients/{patientId}/escalate` | `services/triage/src/handlers/escalate-patient.mjs` | `handler` | Escalates a patient to HIGH priority, recording reviewer display name, status validation (WAITING only), and timestamp updates. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` |
 
 ---
 
@@ -245,6 +246,47 @@ Retrieves active queue metrics and wait time averages for today's queue.
 
 ---
 
+### 2.7 POST `/patients/{patientId}/escalate`
+Escalates a patient's priority to HIGH.
+* **Status Constraint**: Only patients in `WAITING` status can be escalated. Requests to escalate patients in other statuses (e.g. `IN_PROGRESS`, `COMPLETED`) fail with `INVALID_STATUS_TRANSITION` (HTTP 409).
+* **Escalation Rules**: Sets `isEscalated = true`, `escalatedBy` to the reviewer's name, `staffDecision.confirmedPriority = "HIGH"`, and `staffDecision.reviewerDisplayName` to the reviewer's name.
+* **Concurrency Check**: Compares the stored `updatedAt` value fetched during consistent read against the conditional write. If another user updates the patient first, it throws `UPDATE_CONFLICT` (HTTP 409).
+* **Sample Request**:
+  ```json
+  {
+    "reviewerDisplayName": "Dr. Smith"
+  }
+  ```
+* **Success Response (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "patientId": "550e8400-e29b-41d4-a716-446655440000",
+      "queueNumber": "MQ-20260624-0001",
+      "isEscalated": true,
+      "escalatedBy": "Dr. Smith",
+      "staffDecision": {
+        "confirmedPriority": "HIGH",
+        "reviewedAt": "2026-06-24T00:15:00.000Z",
+        "overrideReason": null,
+        "reviewerDisplayName": "Dr. Smith"
+      },
+      "status": "WAITING",
+      "updatedAt": "2026-06-24T00:15:00.000Z"
+    }
+  }
+  ```
+* **Controlled Error Codes**:
+  * `400 INVALID_JSON` (Malformed body payload)
+  * `400 VALIDATION_ERROR` (Missing reviewerDisplayName, empty, or exceeds 100 characters)
+  * `404 PATIENT_NOT_FOUND` (Record doesn't exist)
+  * `409 INVALID_STATUS_TRANSITION` (Status is not WAITING)
+  * `409 UPDATE_CONFLICT` (Optimistic lock conflict)
+  * `500 DATABASE_ERROR` (DynamoDB command failure)
+
+---
+
 ## 3. DynamoDB Table Contract
 
 Deploy a single DynamoDB table matching the primary key schema and index definitions below:
@@ -299,7 +341,7 @@ Deploy a single DynamoDB table matching the primary key schema and index definit
 * **Partition Key**: `gsi1pk` (String)
 * **Sort Key**: `gsi1sk` (String)
 * **Projection Type**: `INCLUDE`
-* **Projected Attributes**: `entityType`, `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment`, `staffDecision`, `createdAt`
+* **Projected Attributes**: `entityType`, `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment`, `staffDecision`, `createdAt`, `isEscalated`, `escalatedBy`
   * **Note**: `sex` and `selfAssessedUrgency` are intentionally excluded from GSI projection (sensitive fields, patient-details only).
 * **Queue Order Behavior**: Querying by `gsi1pk = QUEUE#YYYY-MM-DD` and sorting ascending (ScanIndexForward = true) returns patients ordered by check-in time (First-Come, First-Served).
 
@@ -336,6 +378,11 @@ The minimum IAM permissions required for each Lambda role:
 
 ### 4.6 Queue Stats Lambda Role
 * `dynamodb:Query` (Read on the GSI index specified by `PATIENTS_QUEUE_INDEX_NAME` to retrieve active check-ins)
+* `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+
+### 4.7 Escalate Patient Lambda Role
+* `dynamodb:GetItem` (Base table read)
+* `dynamodb:UpdateItem` (Conditional update of patient attributes matching stored updatedAt)
 * `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
 
 ---
@@ -382,15 +429,16 @@ The AWS teammate should check off the following tasks before handover:
 - [ ] DynamoDB Base table created with primary string partition key `id`.
 - [ ] Global Secondary index created with string PK `gsi1pk`, string SK `gsi1sk`, projection type `INCLUDE`, and required projected keys.
 - [ ] Amazon Bedrock model configured and model access enabled in the target region.
-- [ ] IAM roles configured for five execution lambdas adhering to least privilege.
+- [ ] IAM roles configured for seven execution lambdas adhering to least privilege.
 - [ ] Environment variables configured correctly on all lambdas (verifying indices and tables).
-- [ ] AWS API Gateway proxy paths linked correctly to the six Lambda handlers.
+- [ ] AWS API Gateway proxy paths linked correctly to the seven Lambda handlers.
 - [ ] CloudWatch logs generated, confirming no stack traces or PII leak.
 - [ ] CORS policies enabled for the frontend dashboard domain.
 - [ ] POST `/check-ins` verified (ticket assigned and Bedrock triage populated).
 - [ ] GET `/queue` verified (eventually consistent sorting works asc).
 - [ ] GET `/patients/{patientId}` verified (strongly consistent detail retrieval).
 - [ ] GET `/queue/stats` verified (queue dashboard metrics computed correctly).
+- [ ] POST `/patients/{patientId}/escalate` verified (patient status is WAITING, priority set to HIGH, isEscalated set to true).
 - [ ] PATCH `/patients/{patientId}/priority` verified (optimistic lock prevents override collision).
 - [ ] PATCH `/patients/{patientId}/status` verified (forward-only waittime lifecycle works).
 - [ ] **Security Warning**: Staff dashboard endpoints are not publicly exposed without auth (Cognito or IAM Gateway authorizers) in production environments.
@@ -437,10 +485,21 @@ curl -X PATCH https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e
   -H "content-type: application/json" \
   -d '{
     "confirmedPriority": "HIGH",
-    "overrideReason": "Patient reports worsening symptom profiles."
+    "overrideReason": "Patient condition requires faster staff attention."
   }'
 ```
 *(Verify updatedAt value updates to track the review).*
+
+### Step 4.5: Escalate Patient
+Escalate a WAITING patient's priority to HIGH:
+```bash
+curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000/escalate \
+  -H "content-type: application/json" \
+  -d '{
+    "reviewerDisplayName": "Dr. Smith"
+  }'
+```
+*(Verify that `isEscalated` updates to `true` and `escalatedBy` becomes `"Dr. Smith"`).*
 
 ### Step 5: Transition Status to IN_PROGRESS
 ```bash

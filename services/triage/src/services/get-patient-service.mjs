@@ -58,6 +58,8 @@ export async function getPatientService(patientId, deps = {}) {
       reviewerDisplayName: sd.reviewerDisplayName !== undefined ? sd.reviewerDisplayName : null
     },
     status: item.status || 'WAITING',
+    isEscalated: typeof item.isEscalated === 'boolean' ? item.isEscalated : false,
+    escalatedBy: item.escalatedBy !== undefined ? item.escalatedBy : null,
     createdAt: item.createdAt || '',
     updatedAt: item.updatedAt || ''
   };

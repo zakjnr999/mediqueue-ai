@@ -203,7 +203,7 @@ test('Staff APIs - Repository Tests', async (t) => {
         assert.equal(command.input.Limit, 10);
         assert.equal(command.input.ConsistentRead, undefined); // should be omitted
         assert.equal(command.input.ExclusiveStartKey?.id, 'PATIENT#1');
-        assert.equal(command.input.ProjectionExpression, 'patientId, queueNumber, fullName, age, #status, aiAssessment, staffDecision, createdAt, entityType');
+        assert.equal(command.input.ProjectionExpression, 'patientId, queueNumber, fullName, age, #status, aiAssessment, staffDecision, createdAt, entityType, isEscalated, escalatedBy');
         assert.deepEqual(command.input.ExpressionAttributeNames, { '#status': 'status' });
         
         return {
@@ -396,6 +396,8 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       fullName: 'Alice',
       age: 20,
       status: 'WAITING',
+      isEscalated: false,
+      escalatedBy: null,
       aiAssessment: {
         summary: 'Symptom description',
         redFlags: [],
