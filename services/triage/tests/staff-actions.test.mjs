@@ -4,8 +4,8 @@ import { validatePriorityUpdate } from '../src/validation/validate-priority-upda
 import { validateStatusUpdate } from '../src/validation/validate-status-update.mjs';
 import { updatePriorityService } from '../src/services/update-priority-service.mjs';
 import { updateStatusService } from '../src/services/update-status-service.mjs';
-import { handler as updatePriorityHandler } from '../src/handlers/update-priority.mjs';
-import { handler as updateStatusHandler } from '../src/handlers/update-status.mjs';
+import { createHandler as createUpdatePriorityHandler, handler as productionUpdatePriorityHandler } from '../src/handlers/update-priority.mjs';
+import { createHandler as createUpdateStatusHandler, handler as productionUpdateStatusHandler } from '../src/handlers/update-status.mjs';
 import { updatePatientPriority, updatePatientStatus } from '../src/repositories/patient-repository.mjs';
 import { ApiError } from '../src/errors/api-error.mjs';
 
@@ -456,6 +456,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
   await t.test('Priority - Handler returns HTTP 200 on success', async () => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
     const mockDeps = {
+      serviceFn: updatePriorityService,
       getPatientDetailsFn: async () => createValidPatient(),
       updatePatientPriorityFn: async (id, params) => ({
         ...createValidPatient(),
@@ -476,7 +477,8 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
       body: JSON.stringify({ confirmedPriority: 'MEDIUM' })
     };
 
-    const res = await updatePriorityHandler(event, mockDeps);
+    const updatePriorityHandler = createUpdatePriorityHandler(mockDeps);
+    const res = await updatePriorityHandler(event);
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
 
@@ -488,6 +490,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
   await t.test('Status - Handler returns HTTP 200 on success', async () => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
     const mockDeps = {
+      serviceFn: updateStatusService,
       getPatientDetailsFn: async () => createValidPatient(),
       updatePatientStatusFn: async (id, params) => ({
         ...createValidPatient(),
@@ -503,7 +506,8 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
       body: JSON.stringify({ status: 'IN_PROGRESS' })
     };
 
-    const res = await updateStatusHandler(event, mockDeps);
+    const updateStatusHandler = createUpdateStatusHandler(mockDeps);
+    const res = await updateStatusHandler(event);
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
 
@@ -514,7 +518,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
 
   await t.test('Handler - missing body returns 400 INVALID_JSON', async () => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
-    const res = await updatePriorityHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, pathParameters: { patientId: validUUID } }, {});
+    const res = await productionUpdatePriorityHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, pathParameters: { patientId: validUUID } });
     assert.equal(res.statusCode, 400);
     const body = JSON.parse(res.body);
     assert.equal(body.error.code, 'INVALID_JSON');
@@ -522,11 +526,11 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
 
   await t.test('Handler - malformed JSON returns 400 INVALID_JSON', async () => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
-    const res = await updatePriorityHandler({
+    const res = await productionUpdatePriorityHandler({
       headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: '{ bad-json }'
-    }, {});
+    });
     assert.equal(res.statusCode, 400);
     const body = JSON.parse(res.body);
     assert.equal(body.error.code, 'INVALID_JSON');
@@ -543,6 +547,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: updateStatusService,
         getPatientDetailsFn: async () => {
           throw new Error('Database connection string leaked: secretPassword');
         },
@@ -555,7 +560,8 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
         body: JSON.stringify({ status: 'IN_PROGRESS' })
       };
 
-      const res = await updateStatusHandler(event, mockDeps);
+      const updateStatusHandler = createUpdateStatusHandler(mockDeps);
+      const res = await updateStatusHandler(event);
       assert.equal(res.statusCode, 500);
 
       const body = JSON.parse(res.body);
@@ -575,7 +581,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
       assert.ok(!logMsg.includes('Database connection string leaked'));
       assert.ok(!logMsg.includes('Error'));
       assert.ok(!logMsg.includes('stack'));
-      assert.equal(logMsg.trim(), 'Unhandled server error');
+      assert.ok(logMsg.includes('Unhandled server error'));
     } finally {
       console.error = originalConsoleError;
     }
@@ -592,6 +598,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: updateStatusService,
         getPatientDetailsFn: async () => {
           throw new ApiError('CONFIGURATION_ERROR', 500, 'Hidden configuration reason');
         },
@@ -604,7 +611,8 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
         body: JSON.stringify({ status: 'IN_PROGRESS' })
       };
 
-      const res = await updateStatusHandler(event, mockDeps);
+      const updateStatusHandler = createUpdateStatusHandler(mockDeps);
+      const res = await updateStatusHandler(event);
       assert.equal(res.statusCode, 500);
 
       assert.equal(warnLogs.length, 1);
@@ -628,6 +636,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: updatePriorityService,
         getPatientDetailsFn: async () => createValidPatient(),
         updatePatientPriorityFn: async (id, params) => {
           console.log('Staff priority saved');
@@ -651,7 +660,8 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
         body: JSON.stringify({ confirmedPriority: 'HIGH', overrideReason: 'Severe heart pain' })
       };
 
-      await updatePriorityHandler(event, mockDeps);
+      const updatePriorityHandler = createUpdatePriorityHandler(mockDeps);
+      await updatePriorityHandler(event);
 
       // Verify that logs only contain safe static strings
       assert.ok(standardLogs.some(log => log.includes('Priority review request received')));

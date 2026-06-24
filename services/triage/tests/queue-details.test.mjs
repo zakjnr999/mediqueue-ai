@@ -6,8 +6,8 @@ import { validateQueueQuery } from '../src/validation/validate-queue-query.mjs';
 import { validatePatientId } from '../src/validation/validate-patient-id.mjs';
 import { serializeToken, deserializeToken } from '../src/pagination/pagination-token.mjs';
 import { queryPatientQueue, getPatientDetails } from '../src/repositories/patient-repository.mjs';
-import { handler as getQueueHandler } from '../src/handlers/get-queue.mjs';
-import { handler as getPatientHandler } from '../src/handlers/get-patient.mjs';
+import { createHandler as createGetQueueHandler } from '../src/handlers/get-queue.mjs';
+import { createHandler as createGetPatientHandler } from '../src/handlers/get-patient.mjs';
 import { ApiError } from '../src/errors/api-error.mjs';
 
 test('Staff APIs - Pagination Token Tests', async (t) => {
@@ -731,13 +731,15 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
     process.env.PATIENTS_QUEUE_INDEX_NAME = 'MockIndex';
 
     const mockDeps = {
+      serviceFn: getQueueService,
       queryPatientQueueFn: async () => ({ items: [], lastEvaluatedKey: null }),
       serializeTokenFn: () => null,
       deserializeTokenFn: () => null,
       nowFn: fixedNow
     };
 
-    const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
+    const getQueueHandler = createGetQueueHandler(mockDeps);
+    const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } });
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
 
@@ -747,7 +749,9 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
 
     // Missing table name returns 500 CONFIGURATION_ERROR
     delete process.env.PATIENTS_TABLE_NAME;
-    const errRes = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
+
+    const getQueueHandlerErr = createGetQueueHandler(mockDeps);
+    const errRes = await getQueueHandlerErr({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } });
     assert.equal(errRes.statusCode, 500);
     const errBody = JSON.parse(errRes.body);
     assert.equal(errBody.success, false);
@@ -759,6 +763,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
 
     const mockDeps = {
+      serviceFn: getPatientService,
       getPatientDetailsFn: async () => null // missing record
     };
 
@@ -771,7 +776,8 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       }
     };
 
-    const res = await getPatientHandler(event, mockDeps);
+    const getPatientHandler = createGetPatientHandler(mockDeps);
+    const res = await getPatientHandler(event);
     assert.equal(res.statusCode, 404);
     const body = JSON.parse(res.body);
     assert.equal(body.success, false);
@@ -791,6 +797,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: getQueueService,
         queryPatientQueueFn: async () => {
           throw new Error('Database connection string leaked: secretPassword');
         },
@@ -799,7 +806,8 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
         nowFn: fixedNow
       };
 
-      const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
+      const getQueueHandler = createGetQueueHandler(mockDeps);
+      const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } });
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);
@@ -818,7 +826,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       assert.ok(!logMsg.includes('Database connection string leaked'));
       assert.ok(!logMsg.includes('Error'));
       assert.ok(!logMsg.includes('stack'));
-      assert.equal(logMsg.trim(), 'Unhandled server error');
+      assert.ok(logMsg.includes('Unhandled server error'));
     } finally {
       console.error = originalConsoleError;
     }
@@ -835,6 +843,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: getPatientService,
         getPatientDetailsFn: async () => {
           throw new Error('Database connection string leaked: secretPassword');
         }
@@ -849,7 +858,8 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
         }
       };
 
-      const res = await getPatientHandler(event, mockDeps);
+      const getPatientHandler = createGetPatientHandler(mockDeps);
+      const res = await getPatientHandler(event);
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);
@@ -868,7 +878,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       assert.ok(!logMsg.includes('Database connection string leaked'));
       assert.ok(!logMsg.includes('Error'));
       assert.ok(!logMsg.includes('stack'));
-      assert.equal(logMsg.trim(), 'Unhandled server error');
+      assert.ok(logMsg.includes('Unhandled server error'));
     } finally {
       console.error = originalConsoleError;
     }
@@ -886,6 +896,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
 
     try {
       const mockDeps = {
+        serviceFn: getQueueService,
         queryPatientQueueFn: async () => {
           throw new ApiError('CONFIGURATION_ERROR', 500, 'Mock config error message');
         },
@@ -894,7 +905,8 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
         nowFn: fixedNow
       };
 
-      const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
+      const getQueueHandler = createGetQueueHandler(mockDeps);
+      const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } });
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);

@@ -8,16 +8,18 @@ This document details the configuration, permissions, architecture, and packagin
 
 All handlers are configured as **ES modules (`.mjs`)** and expose a standard async `handler` function.
 
-| HTTP Method | Route | File Path | Exported Handler | Purpose | Required Env Variables | Required Permissions |
+For each handler, the Lambda handler configuration setting in AWS is specified as the extensionless path relative to the archive root (which starts with `src/`) followed by the exported handler name:
+
+| HTTP Method | Route | File Path | Lambda Handler Configuration | Purpose | Required Env Variables | Required Permissions |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **POST** | `/check-ins` | `services/triage/src/handlers/create-checkin.mjs` | `handler` | Validates patient input, requests Bedrock symptom assessment (PII-stripped), atomically increments daily counter, and saves patient record. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `BEDROCK_MODEL_ID`, `PATIENTS_QUEUE_INDEX_NAME`, `AVERAGE_WAIT_TIME_MULTIPLIER` | `bedrock:InvokeModel`, `dynamodb:UpdateItem` (counter), `dynamodb:PutItem` (patient), `dynamodb:Query` (GSI index) |
-| **GET** | `/queue` | `services/triage/src/handlers/get-queue.mjs` | `handler` | Retrieves patient queue list for a given date from GSI, filtered by WAITING/IN_PROGRESS/COMPLETED statuses. Supports opaque Base64url pagination tokens. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
-| **GET** | `/patients/{patientId}` | `services/triage/src/handlers/get-patient.mjs` | `handler` | Retrieves full check-in record details and wait times using strongly consistent read and GSI query. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME`, `AVERAGE_WAIT_TIME_MULTIPLIER` | `dynamodb:GetItem` (patient), `dynamodb:Query` (GSI index) |
-| **PATCH** | `/patients/{patientId}/priority` | `services/triage/src/handlers/update-priority.mjs` | `handler` | Saves staff confirmed priority and override reasons, protected by concurrency timestamp validations. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
-| **PATCH** | `/patients/{patientId}/status` | `services/triage/src/handlers/update-status.mjs` | `handler` | Updates queue status forward-only (`WAITING → IN_PROGRESS → COMPLETED`), protected by race-condition checks. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
-| **GET** | `/queue/stats` | `services/triage/src/handlers/get-stats.mjs` | `handler` | Computes today's wait queue statistics (inQueue, avgWaitTimeMinutes, redFlags, seenToday). | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
-| **POST** | `/patients/{patientId}/escalate` | `services/triage/src/handlers/escalate-patient.mjs` | `handler` | Escalates a patient to HIGH priority, recording reviewer display name, status validation (WAITING only), and timestamp updates. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` |
-| **POST** | `/auth/login` | `services/triage/src/handlers/login.mjs` | `handler` | Authenticates staff credentials against Cognito User Pool and returns Access, ID, and Refresh tokens. | `AWS_REGION`, `COGNITO_USER_POOL_CLIENT_ID` | None (Requires Cognito connectivity) |
+| **POST** | `/check-ins` | `services/triage/src/handlers/create-checkin.mjs` | `src/handlers/create-checkin.handler` | Validates patient input, requests Bedrock symptom assessment (PII-stripped), atomically increments daily counter, and saves patient record. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `BEDROCK_MODEL_ID`, `PATIENTS_QUEUE_INDEX_NAME`, `AVERAGE_WAIT_TIME_MULTIPLIER` | `bedrock:InvokeModel`, `dynamodb:UpdateItem` (counter), `dynamodb:PutItem` (patient), `dynamodb:Query` (GSI index) |
+| **GET** | `/queue` | `services/triage/src/handlers/get-queue.mjs` | `src/handlers/get-queue.handler` | Retrieves patient queue list for a given date from GSI, filtered by WAITING/IN_PROGRESS/COMPLETED statuses. Supports opaque Base64url pagination tokens. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
+| **GET** | `/patients/{patientId}` | `services/triage/src/handlers/get-patient.mjs` | `src/handlers/get-patient.handler` | Retrieves full check-in record details and wait times using strongly consistent read and GSI query. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME`, `AVERAGE_WAIT_TIME_MULTIPLIER` | `dynamodb:GetItem` (patient), `dynamodb:Query` (GSI index) |
+| **PATCH** | `/patients/{patientId}/priority` | `services/triage/src/handlers/update-priority.mjs` | `src/handlers/update-priority.handler` | Saves staff confirmed priority and override reasons, protected by concurrency timestamp validations. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
+| **PATCH** | `/patients/{patientId}/status` | `services/triage/src/handlers/update-status.mjs` | `src/handlers/update-status.handler` | Updates queue status forward-only (`WAITING → IN_PROGRESS → COMPLETED`), protected by race-condition checks. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
+| **GET** | `/queue/stats` | `services/triage/src/handlers/get-stats.mjs` | `src/handlers/get-stats.handler` | Computes today's wait queue statistics (inQueue, avgWaitTimeMinutes, redFlags, seenToday). | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
+| **POST** | `/patients/{patientId}/escalate` | `services/triage/src/handlers/escalate-patient.mjs` | `src/handlers/escalate-patient.handler` | Escalates a patient to HIGH priority, recording reviewer display name, status validation (WAITING only), and timestamp updates. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` |
+| **POST** | `/auth/login` | `services/triage/src/handlers/login.mjs` | `src/handlers/login.handler` | Authenticates staff credentials against Cognito User Pool and returns Access, ID, and Refresh tokens. | `AWS_REGION`, `COGNITO_USER_POOL_CLIENT_ID` | None (Requires Cognito connectivity) |
 
 ---
 
@@ -454,12 +456,25 @@ The minimum IAM permissions required for each Lambda role:
   * `@aws-sdk/lib-dynamodb` (`^3.1075.0`)
 * **Working Directory**: Package zip files must be created relative to `services/triage/`.
 * **Packaging Instructions**:
-  * Include production `node_modules`. Run:
-    ```bash
-    npm install --omit=dev
-    ```
-  * Package all source directories (`src/`), custom error types, validators, response wrappers, and dependency configuration files.
-  * Omit mock test directories (`tests/`) from the deployment package.
+  To construct a clean deployment bundle, run the following commands from the `services/triage/` directory:
+  ```bash
+  rm -rf .lambda-package mediqueue-backend.zip
+  mkdir .lambda-package
+
+  cp -R src .lambda-package/
+  cp package.json package-lock.json .lambda-package/
+
+  cd .lambda-package
+  npm ci --omit=dev
+  zip -r ../mediqueue-backend.zip src node_modules package.json package-lock.json
+  cd ..
+  ```
+  Note: Make sure `.lambda-package/` and generated deployment ZIP files (`*.zip`) are ignored in `.gitignore`.
+  The resulting deployment archive `mediqueue-backend.zip` root must contain:
+  * `src/` (handlers and application modules)
+  * `node_modules/` (production dependencies only)
+  * `package.json`
+  * `package-lock.json`
 
 ---
 
@@ -467,10 +482,10 @@ The minimum IAM permissions required for each Lambda role:
 
 These variables must be populated on the corresponding Lambda configurations:
 
-| Variable | Required by | Status | Example Placeholder | Purpose |
+| Variable | Required by | Status | Example/Mode Configurations | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| `AWS_REGION` | All Functions | Optional | `us-west-2` | Targets target Bedrock and DynamoDB instances (defaults to `us-west-2`). |
-| `BEDROCK_MODEL_ID` | Check-in Lambda | Required | `us.amazon.nova-lite-v1:0` | The exact active model/profile ID in Bedrock Converse API. |
+| `AWS_REGION` | All Functions | Optional | `us-west-2` | Targets Bedrock and DynamoDB instances (defaults to `us-west-2`). |
+| `BEDROCK_MODEL_ID` | Check-in Lambda | Required | `amazon.nova-lite-v1:0` (Direct invocation)<br>OR<br>`us.amazon.nova-lite-v1:0` (US Cross-Region Inference Profile) | The exact active model or inference profile ID in Bedrock Converse API. The AWS team should select the value matching its IAM permissions and deployment mode. *Current deployment example: `BEDROCK_MODEL_ID=amazon.nova-lite-v1:0`* |
 | `PATIENTS_TABLE_NAME` | All Functions | Required | `MediQueuePatientsTable-Dev` | Target Base table name. |
 | `PATIENTS_QUEUE_INDEX_NAME` | Queue List, Patient Details, Queue Stats, Check-in | Required | `gsi1` | Target Global Secondary Index name. |
 | `AVERAGE_WAIT_TIME_MULTIPLIER` | Check-in, Patient Details | Optional | `5` | Multiplier (in minutes) per person ahead to estimate wait times (defaults to 5). |

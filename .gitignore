@@ -8,3 +8,5 @@ build/
 .kiro/
 .DS_Store
 coverage/
+.lambda-package/
+*.zip
