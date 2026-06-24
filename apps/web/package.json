@@ -3,14 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "frontend",
-    "backend"
+    "frontend"
   ],
   "scripts": {
-    "dev": "concurrently -k \"npm run dev -w frontend\" \"npm run dev -w backend\"",
-    "build": "npm run build -w frontend && npm run build -w backend",
-    "start": "npm run start -w frontend & npm run start -w backend",
-    "lint": "npm run lint -w frontend && npm run lint -w backend",
+    "dev": "npm run dev -w frontend",
+    "build": "npm run build -w frontend",
+    "start": "npm run start -w frontend",
+    "lint": "npm run lint -w frontend",
     "clean": "npm run clean -w frontend",
     "test": "node --test tests/*.test.mjs"
   },
