@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CheckinError } from '../errors/checkin-error.mjs';
 import { ApiError } from '../errors/api-error.mjs';
 
@@ -107,5 +107,103 @@ export async function getPatientDetails(docClient, tableName, patientId) {
     return response.Item || null;
   } catch (err) {
     throw new ApiError('DATABASE_ERROR', 500, `Database retrieval failed: ${err.message}`, err);
+  }
+}
+
+/**
+ * Updates patient priority with concurrency check on updatedAt.
+ *
+ * @param {object} docClient - DynamoDBDocumentClient instance
+ * @param {string} tableName - Table name
+ * @param {string} patientId - UUID
+ * @param {object} params
+ * @param {string} params.confirmedPriority - HIGH, MEDIUM, LOW
+ * @param {string|null} params.overrideReason - string or null
+ * @param {string} params.reviewedAt - ISO timestamp
+ * @param {string} params.expectedUpdatedAt - Expect stored updatedAt to match this
+ * @param {string} params.updatedAt - ISO timestamp (same as reviewedAt)
+ * @returns {Promise<object>} Updated patient record
+ * @throws {ApiError}
+ */
+export async function updatePatientPriority(docClient, tableName, patientId, { confirmedPriority, overrideReason, reviewedAt, expectedUpdatedAt, updatedAt }) {
+  if (!tableName || tableName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database table name configuration is missing');
+  }
+
+  try {
+    const response = await docClient.send(new UpdateCommand({
+      TableName: tableName,
+      Key: {
+        id: `PATIENT#${patientId}`
+      },
+      UpdateExpression: 'SET staffDecision.confirmedPriority = :cp, staffDecision.reviewedAt = :ra, staffDecision.reviewedBy = :rb, staffDecision.overrideReason = :or, #updatedAt = :ua',
+      ConditionExpression: 'attribute_exists(id) AND entityType = :checkinEntityType AND #updatedAt = :expectedUpdatedAt',
+      ExpressionAttributeNames: {
+        '#updatedAt': 'updatedAt'
+      },
+      ExpressionAttributeValues: {
+        ':cp': confirmedPriority,
+        ':ra': reviewedAt,
+        ':rb': null,
+        ':or': overrideReason,
+        ':ua': updatedAt,
+        ':checkinEntityType': 'PATIENT_CHECKIN',
+        ':expectedUpdatedAt': expectedUpdatedAt
+      },
+      ReturnValues: 'ALL_NEW'
+    }));
+    return response.Attributes;
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      throw new ApiError('UPDATE_CONFLICT', 409, 'The patient record was updated by another user. Please reload and try again.', err);
+    }
+    throw new ApiError('DATABASE_ERROR', 500, `Database update failed: ${err.message}`, err);
+  }
+}
+
+/**
+ * Updates patient status with race-condition protection.
+ *
+ * @param {object} docClient - DynamoDBDocumentClient instance
+ * @param {string} tableName - Table name
+ * @param {string} patientId - UUID
+ * @param {object} params
+ * @param {string} params.newStatus - WAITING, IN_PROGRESS, COMPLETED
+ * @param {string} params.expectedCurrentStatus - Expect stored status to match this
+ * @param {string} params.updatedAt - ISO timestamp
+ * @returns {Promise<object>} Updated patient record
+ * @throws {ApiError}
+ */
+export async function updatePatientStatus(docClient, tableName, patientId, { newStatus, expectedCurrentStatus, updatedAt }) {
+  if (!tableName || tableName.trim() === '') {
+    throw new ApiError('CONFIGURATION_ERROR', 500, 'Database table name configuration is missing');
+  }
+
+  try {
+    const response = await docClient.send(new UpdateCommand({
+      TableName: tableName,
+      Key: {
+        id: `PATIENT#${patientId}`
+      },
+      UpdateExpression: 'SET #status = :ns, #updatedAt = :ua',
+      ConditionExpression: 'attribute_exists(id) AND entityType = :checkinEntityType AND #status = :expectedCurrentStatus',
+      ExpressionAttributeNames: {
+        '#status': 'status',
+        '#updatedAt': 'updatedAt'
+      },
+      ExpressionAttributeValues: {
+        ':ns': newStatus,
+        ':ua': updatedAt,
+        ':checkinEntityType': 'PATIENT_CHECKIN',
+        ':expectedCurrentStatus': expectedCurrentStatus
+      },
+      ReturnValues: 'ALL_NEW'
+    }));
+    return response.Attributes;
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      throw new ApiError('UPDATE_CONFLICT', 409, 'The patient record status was updated by another user. Please reload and try again.', err);
+    }
+    throw new ApiError('DATABASE_ERROR', 500, `Database update failed: ${err.message}`, err);
   }
 }
