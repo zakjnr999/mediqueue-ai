@@ -559,6 +559,67 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
     assert.equal(details.staffDecision.reviewerDisplayName, null);
   });
 
+  await t.test('GET /patients/{patientId} calculates wait times and people ahead correctly', async () => {
+    let countCalled = false;
+    const deps = {
+      getPatientDetailsFn: async () => ({
+        patientId: validUUID,
+        queueNumber: 'MQ-2',
+        fullName: 'Jane',
+        age: 30,
+        symptoms: ['cough'],
+        entityType: 'PATIENT_CHECKIN',
+        aiAssessment: { summary: 'c', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false },
+        staffDecision: { confirmedPriority: null },
+        status: 'WAITING',
+        createdAt: '2026-06-23T14:30:00.000Z',
+        updatedAt: '2026-06-23T14:30:00.000Z',
+        id: `PATIENT#${validUUID}`,
+        gsi1pk: 'QUEUE'
+      }),
+      countPeopleAheadFn: async (dateStr, createdAt, patientId) => {
+        countCalled = true;
+        assert.equal(dateStr, '2026-06-23');
+        assert.equal(createdAt, '2026-06-23T14:30:00.000Z');
+        assert.equal(patientId, validUUID);
+        return 4;
+      }
+    };
+
+    const details = await getPatientService(validUUID, deps);
+    assert.ok(countCalled);
+    assert.equal(details.peopleAhead, 4);
+    assert.equal(details.estimatedWaitTimeMinutes, 20);
+  });
+
+  await t.test('GET /patients/{patientId} returns 0 wait time when status is not WAITING', async () => {
+    const deps = {
+      getPatientDetailsFn: async () => ({
+        patientId: validUUID,
+        queueNumber: 'MQ-2',
+        fullName: 'Jane',
+        age: 30,
+        symptoms: ['cough'],
+        entityType: 'PATIENT_CHECKIN',
+        aiAssessment: { summary: 'c', redFlags: [], suggestedPriority: 'LOW', reason: 'ok', requiresImmediateStaffReview: false },
+        staffDecision: { confirmedPriority: null },
+        status: 'IN_PROGRESS',
+        createdAt: '2026-06-23T14:30:00.000Z',
+        updatedAt: '2026-06-23T14:30:00.000Z',
+        id: `PATIENT#${validUUID}`,
+        gsi1pk: 'QUEUE'
+      }),
+      countPeopleAheadFn: async () => {
+        throw new Error('Should not be called');
+      }
+    };
+
+    const details = await getPatientService(validUUID, deps);
+    assert.equal(details.status, 'IN_PROGRESS');
+    assert.equal(details.peopleAhead, 0);
+    assert.equal(details.estimatedWaitTimeMinutes, 0);
+  });
+
   await t.test('GET /patients/{patientId} service throws PATIENT_NOT_FOUND on wrong entity type', async () => {
     const deps = {
       getPatientDetailsFn: async () => ({

@@ -10,11 +10,12 @@ All handlers are configured as **ES modules (`.mjs`)** and expose a standard asy
 
 | HTTP Method | Route | File Path | Exported Handler | Purpose | Required Env Variables | Required Permissions |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **POST** | `/check-ins` | `services/triage/src/handlers/create-checkin.mjs` | `handler` | Validates patient input, requests Bedrock symptom assessment (PII-stripped), atomically increments daily counter, and saves patient record. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `BEDROCK_MODEL_ID` | `bedrock:InvokeModel`, `dynamodb:UpdateItem` (counter), `dynamodb:PutItem` (patient) |
+| **POST** | `/check-ins` | `services/triage/src/handlers/create-checkin.mjs` | `handler` | Validates patient input, requests Bedrock symptom assessment (PII-stripped), atomically increments daily counter, and saves patient record. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `BEDROCK_MODEL_ID`, `PATIENTS_QUEUE_INDEX_NAME`, `AVERAGE_WAIT_TIME_MULTIPLIER` | `bedrock:InvokeModel`, `dynamodb:UpdateItem` (counter), `dynamodb:PutItem` (patient), `dynamodb:Query` (GSI index) |
 | **GET** | `/queue` | `services/triage/src/handlers/get-queue.mjs` | `handler` | Retrieves patient queue list for a given date from GSI, filtered by WAITING/IN_PROGRESS/COMPLETED statuses. Supports opaque Base64url pagination tokens. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
-| **GET** | `/patients/{patientId}` | `services/triage/src/handlers/get-patient.mjs` | `handler` | Retrieves full check-in record details using strongly consistent table read. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem` (patient) |
+| **GET** | `/patients/{patientId}` | `services/triage/src/handlers/get-patient.mjs` | `handler` | Retrieves full check-in record details and wait times using strongly consistent read and GSI query. | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME`, `AVERAGE_WAIT_TIME_MULTIPLIER` | `dynamodb:GetItem` (patient), `dynamodb:Query` (GSI index) |
 | **PATCH** | `/patients/{patientId}/priority` | `services/triage/src/handlers/update-priority.mjs` | `handler` | Saves staff confirmed priority and override reasons, protected by concurrency timestamp validations. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
 | **PATCH** | `/patients/{patientId}/status` | `services/triage/src/handlers/update-status.mjs` | `handler` | Updates queue status forward-only (`WAITING → IN_PROGRESS → COMPLETED`), protected by race-condition checks. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
+| **GET** | `/queue/stats` | `services/triage/src/handlers/get-stats.mjs` | `handler` | Computes today's wait queue statistics (inQueue, avgWaitTimeMinutes, redFlags, seenToday). | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
 
 ---
 
@@ -52,6 +53,8 @@ Submits a clinical check-in ticket.
       },
       "sex": "Male",
       "selfAssessedUrgency": "Urgent",
+      "peopleAhead": 0,
+      "estimatedWaitTimeMinutes": 0,
       "createdAt": "2026-06-24T00:00:00.000Z"
     }
   }
@@ -140,6 +143,8 @@ Retrieves a detailed view card of a patient's symptoms and triage details.
         "reviewerDisplayName": null
       },
       "status": "WAITING",
+      "peopleAhead": 0,
+      "estimatedWaitTimeMinutes": 0,
       "createdAt": "2026-06-24T00:00:00.000Z",
       "updatedAt": "2026-06-24T00:00:00.000Z"
     }
@@ -214,6 +219,29 @@ Moves patients forward along queue stages.
     }
   }
   ```
+
+---
+
+### 2.6 GET `/queue/stats`
+Retrieves active queue metrics and wait time averages for today's queue.
+* **Query Parameters**:
+  * `date` (Optional): `YYYY-MM-DD` (defaults to current UTC date).
+* **Success Response (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "date": "2026-06-24",
+      "inQueue": 3,
+      "avgWaitTimeMinutes": 15,
+      "redFlags": 1,
+      "seenToday": 1
+    }
+  }
+  ```
+* **Controlled Error Codes**:
+  * `400 VALIDATION_ERROR` (Invalid date format)
+  * `500 DATABASE_ERROR` (DynamoDB query failed)
 
 ---
 
@@ -293,6 +321,7 @@ The minimum IAM permissions required for each Lambda role:
 
 ### 4.3 Patient Details Lambda Role
 * `dynamodb:GetItem` (Strongly consistent base table read)
+* `dynamodb:Query` (Read on the GSI index specified by `PATIENTS_QUEUE_INDEX_NAME` to count peopleAhead)
 * `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
 
 ### 4.4 Priority Update Lambda Role
@@ -303,6 +332,10 @@ The minimum IAM permissions required for each Lambda role:
 ### 4.5 Status Update Lambda Role
 * `dynamodb:GetItem` (Base table read)
 * `dynamodb:UpdateItem` (Conditional update of status attributes matching stored status)
+* `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+
+### 4.6 Queue Stats Lambda Role
+* `dynamodb:Query` (Read on the GSI index specified by `PATIENTS_QUEUE_INDEX_NAME` to retrieve active check-ins)
 * `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
 
 ---
@@ -335,7 +368,8 @@ These variables must be populated on the corresponding Lambda configurations:
 | `AWS_REGION` | All Functions | Optional | `us-west-2` | Targets target Bedrock and DynamoDB instances (defaults to `us-west-2`). |
 | `BEDROCK_MODEL_ID` | Check-in Lambda | Required | `us.amazon.nova-lite-v1:0` | The exact active model/profile ID in Bedrock Converse API. |
 | `PATIENTS_TABLE_NAME` | All Functions | Required | `MediQueuePatientsTable-Dev` | Target Base table name. |
-| `PATIENTS_QUEUE_INDEX_NAME` | Queue List Lambda | Required | `gsi1` | Target Global Secondary Index name. |
+| `PATIENTS_QUEUE_INDEX_NAME` | Queue List, Patient Details, Queue Stats, Check-in | Required | `gsi1` | Target Global Secondary Index name. |
+| `AVERAGE_WAIT_TIME_MULTIPLIER` | Check-in, Patient Details | Optional | `5` | Multiplier (in minutes) per person ahead to estimate wait times (defaults to 5). |
 
 *Warning: Never bake AWS access credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) directly into deployment packages or environment variables. Execution roles must supply these.*
 
@@ -350,12 +384,13 @@ The AWS teammate should check off the following tasks before handover:
 - [ ] Amazon Bedrock model configured and model access enabled in the target region.
 - [ ] IAM roles configured for five execution lambdas adhering to least privilege.
 - [ ] Environment variables configured correctly on all lambdas (verifying indices and tables).
-- [ ] AWS API Gateway proxy paths linked correctly to the five Lambda handlers.
+- [ ] AWS API Gateway proxy paths linked correctly to the six Lambda handlers.
 - [ ] CloudWatch logs generated, confirming no stack traces or PII leak.
 - [ ] CORS policies enabled for the frontend dashboard domain.
 - [ ] POST `/check-ins` verified (ticket assigned and Bedrock triage populated).
 - [ ] GET `/queue` verified (eventually consistent sorting works asc).
 - [ ] GET `/patients/{patientId}` verified (strongly consistent detail retrieval).
+- [ ] GET `/queue/stats` verified (queue dashboard metrics computed correctly).
 - [ ] PATCH `/patients/{patientId}/priority` verified (optimistic lock prevents override collision).
 - [ ] PATCH `/patients/{patientId}/status` verified (forward-only waittime lifecycle works).
 - [ ] **Security Warning**: Staff dashboard endpoints are not publicly exposed without auth (Cognito or IAM Gateway authorizers) in production environments.
@@ -388,6 +423,11 @@ curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue?limit=10
 ### Step 3: Retrieve Patient Details
 ```bash
 curl -X GET https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000
+```
+
+### Step 3.5: Retrieve Queue Stats
+```bash
+curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue/stats?date=2026-06-24"
 ```
 
 ### Step 4: Override or Confirm Priority
