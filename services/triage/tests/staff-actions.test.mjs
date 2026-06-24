@@ -471,6 +471,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
     };
 
     const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: JSON.stringify({ confirmedPriority: 'MEDIUM' })
     };
@@ -497,6 +498,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
     };
 
     const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: JSON.stringify({ status: 'IN_PROGRESS' })
     };
@@ -512,7 +514,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
 
   await t.test('Handler - missing body returns 400 INVALID_JSON', async () => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
-    const res = await updatePriorityHandler({ pathParameters: { patientId: validUUID } }, {});
+    const res = await updatePriorityHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, pathParameters: { patientId: validUUID } }, {});
     assert.equal(res.statusCode, 400);
     const body = JSON.parse(res.body);
     assert.equal(body.error.code, 'INVALID_JSON');
@@ -521,6 +523,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
   await t.test('Handler - malformed JSON returns 400 INVALID_JSON', async () => {
     process.env.PATIENTS_TABLE_NAME = 'MockTable';
     const res = await updatePriorityHandler({
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: '{ bad-json }'
     }, {});
@@ -547,6 +550,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
       };
 
       const event = {
+        headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
         pathParameters: { patientId: validUUID },
         body: JSON.stringify({ status: 'IN_PROGRESS' })
       };
@@ -595,6 +599,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
       };
 
       const event = {
+        headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
         pathParameters: { patientId: validUUID },
         body: JSON.stringify({ status: 'IN_PROGRESS' })
       };
@@ -641,6 +646,7 @@ test('Staff Actions - Handler Behaviour & Privacy Leak Tests', async (t) => {
       };
 
       const event = {
+        headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
         pathParameters: { patientId: validUUID },
         body: JSON.stringify({ confirmedPriority: 'HIGH', overrideReason: 'Severe heart pain' })
       };

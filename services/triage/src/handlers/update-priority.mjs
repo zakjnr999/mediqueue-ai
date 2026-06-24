@@ -2,6 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { updatePriorityService } from '../services/update-priority-service.mjs';
 import { getPatientDetails, updatePatientPriority } from '../repositories/patient-repository.mjs';
+import { requireAuthentication } from '../middleware/auth-middleware.mjs';
 import { ApiError } from '../errors/api-error.mjs';
 import { apiResponse } from '../responses/api-response.mjs';
 
@@ -32,6 +33,8 @@ export async function handler(event, injectedDeps = null) {
   console.log('Priority review request received');
 
   try {
+    requireAuthentication(event);
+
     const tableName = process.env.PATIENTS_TABLE_NAME;
 
     // Validate table configuration early

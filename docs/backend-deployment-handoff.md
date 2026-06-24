@@ -17,6 +17,7 @@ All handlers are configured as **ES modules (`.mjs`)** and expose a standard asy
 | **PATCH** | `/patients/{patientId}/status` | `services/triage/src/handlers/update-status.mjs` | `handler` | Updates queue status forward-only (`WAITING → IN_PROGRESS → COMPLETED`), protected by race-condition checks. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` (patient) |
 | **GET** | `/queue/stats` | `services/triage/src/handlers/get-stats.mjs` | `handler` | Computes today's wait queue statistics (inQueue, avgWaitTimeMinutes, redFlags, seenToday). | `AWS_REGION`, `PATIENTS_TABLE_NAME`, `PATIENTS_QUEUE_INDEX_NAME` | `dynamodb:Query` (GSI index) |
 | **POST** | `/patients/{patientId}/escalate` | `services/triage/src/handlers/escalate-patient.mjs` | `handler` | Escalates a patient to HIGH priority, recording reviewer display name, status validation (WAITING only), and timestamp updates. | `AWS_REGION`, `PATIENTS_TABLE_NAME` | `dynamodb:GetItem`, `dynamodb:UpdateItem` |
+| **POST** | `/auth/login` | `services/triage/src/handlers/login.mjs` | `handler` | Authenticates staff credentials against Cognito User Pool and returns Access, ID, and Refresh tokens. | `AWS_REGION`, `COGNITO_USER_POOL_CLIENT_ID` | None (Requires Cognito connectivity) |
 
 ---
 
@@ -287,6 +288,36 @@ Escalates a patient's priority to HIGH.
 
 ---
 
+### 2.8 POST `/auth/login`
+Authenticates staff credentials with the Cognito User Pool.
+* **Sample Request**:
+  ```json
+  {
+    "email": "staff@hospital.com",
+    "password": "SecurePassword123!"
+  }
+  ```
+* **Success Response (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "accessToken": "eyJhbGciOi...",
+      "idToken": "eyJhbGciOi...",
+      "refreshToken": "eyJhbGciOi...",
+      "expiresIn": 3600
+    }
+  }
+  ```
+* **Controlled Error Codes**:
+  * `400 INVALID_JSON` (Malformed body payload)
+  * `400 VALIDATION_ERROR` (Missing email/password, invalid email format)
+  * `400 PASSWORD_RESET_REQUIRED` (User must change password on next sign-in)
+  * `401 UNAUTHORIZED` (Invalid email or password)
+  * `500 AUTH_SERVICE_ERROR` (Cognito client invocation failure)
+
+---
+
 ## 3. DynamoDB Table Contract
 
 Deploy a single DynamoDB table matching the primary key schema and index definitions below:
@@ -385,6 +416,10 @@ The minimum IAM permissions required for each Lambda role:
 * `dynamodb:UpdateItem` (Conditional update of patient attributes matching stored updatedAt)
 * `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
 
+### 4.8 Login Lambda Role
+* `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+* (No DynamoDB or Bedrock access required; needs outbound network access to Cognito endpoints).
+
 ---
 
 ## 5. Runtime and Packaging Requirements
@@ -393,6 +428,7 @@ The minimum IAM permissions required for each Lambda role:
 * **Package Manager**: npm.
 * **Production Dependencies** (from `package.json`):
   * `@aws-sdk/client-bedrock-runtime` (`^3.1075.0`)
+  * `@aws-sdk/client-cognito-identity-provider` (`^3.1075.0`)
   * `@aws-sdk/client-dynamodb` (`^3.1075.0`)
   * `@aws-sdk/lib-dynamodb` (`^3.1075.0`)
 * **Working Directory**: Package zip files must be created relative to `services/triage/`.
@@ -417,6 +453,7 @@ These variables must be populated on the corresponding Lambda configurations:
 | `PATIENTS_TABLE_NAME` | All Functions | Required | `MediQueuePatientsTable-Dev` | Target Base table name. |
 | `PATIENTS_QUEUE_INDEX_NAME` | Queue List, Patient Details, Queue Stats, Check-in | Required | `gsi1` | Target Global Secondary Index name. |
 | `AVERAGE_WAIT_TIME_MULTIPLIER` | Check-in, Patient Details | Optional | `5` | Multiplier (in minutes) per person ahead to estimate wait times (defaults to 5). |
+| `COGNITO_USER_POOL_CLIENT_ID` | Login Lambda | Required | `3n45abcdef...` | The Cognito User Pool Client ID used for client-side authentication. |
 
 *Warning: Never bake AWS access credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) directly into deployment packages or environment variables. Execution roles must supply these.*
 
@@ -426,21 +463,24 @@ These variables must be populated on the corresponding Lambda configurations:
 
 The AWS teammate should check off the following tasks before handover:
 
+- [ ] Cognito User Pool and Client created (via CDK project under `infrastructure/`).
 - [ ] DynamoDB Base table created with primary string partition key `id`.
 - [ ] Global Secondary index created with string PK `gsi1pk`, string SK `gsi1sk`, projection type `INCLUDE`, and required projected keys.
 - [ ] Amazon Bedrock model configured and model access enabled in the target region.
-- [ ] IAM roles configured for seven execution lambdas adhering to least privilege.
-- [ ] Environment variables configured correctly on all lambdas (verifying indices and tables).
-- [ ] AWS API Gateway proxy paths linked correctly to the seven Lambda handlers.
+- [ ] IAM roles configured for eight execution lambdas adhering to least privilege.
+- [ ] Environment variables configured correctly on all lambdas (verifying indices, tables, and Cognito client).
+- [ ] AWS API Gateway proxy paths linked correctly to the eight Lambda handlers.
+- [ ] API Gateway Cognito Authorizer configured for all staff-facing endpoints.
 - [ ] CloudWatch logs generated, confirming no stack traces or PII leak.
 - [ ] CORS policies enabled for the frontend dashboard domain.
+- [ ] POST `/auth/login` verified (credentials successfully authenticated and JWT tokens returned).
 - [ ] POST `/check-ins` verified (ticket assigned and Bedrock triage populated).
-- [ ] GET `/queue` verified (eventually consistent sorting works asc).
-- [ ] GET `/patients/{patientId}` verified (strongly consistent detail retrieval).
-- [ ] GET `/queue/stats` verified (queue dashboard metrics computed correctly).
-- [ ] POST `/patients/{patientId}/escalate` verified (patient status is WAITING, priority set to HIGH, isEscalated set to true).
-- [ ] PATCH `/patients/{patientId}/priority` verified (optimistic lock prevents override collision).
-- [ ] PATCH `/patients/{patientId}/status` verified (forward-only waittime lifecycle works).
+- [ ] GET `/queue` verified (eventually consistent sorting works asc, requires Authorization).
+- [ ] GET `/patients/{patientId}` verified (strongly consistent detail retrieval, requires Authorization).
+- [ ] GET `/queue/stats` verified (queue dashboard metrics computed correctly, requires Authorization).
+- [ ] POST `/patients/{patientId}/escalate` verified (patient status is WAITING, priority set to HIGH, isEscalated set to true, requires Authorization).
+- [ ] PATCH `/patients/{patientId}/priority` verified (optimistic lock prevents override collision, requires Authorization).
+- [ ] PATCH `/patients/{patientId}/status` verified (forward-only waittime lifecycle works, requires Authorization).
 - [ ] **Security Warning**: Staff dashboard endpoints are not publicly exposed without auth (Cognito or IAM Gateway authorizers) in production environments.
 
 ---
@@ -449,7 +489,19 @@ The AWS teammate should check off the following tasks before handover:
 
 Test deployment via curl against API Gateway endpoint: `https://<api-id>.execute-api.us-west-2.amazonaws.com`.
 
+### Step 0: Staff Login
+```bash
+curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/auth/login \
+  -H "content-type: application/json" \
+  -d '{
+    "email": "staff@hospital.com",
+    "password": "SecurePassword123!"
+  }'
+```
+*(Copy the generated `idToken` from the response JSON and use it as `<id-token>` in all subsequent staff queries).*
+
 ### Step 1: Create Patient Check-In
+*(This is patient-facing and public, no authentication header required).*
 ```bash
 curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/check-ins \
   -H "content-type: application/json" \
@@ -465,17 +517,20 @@ curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/check-ins \
 
 ### Step 2: Retrieve Queue List
 ```bash
-curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue?limit=10"
+curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue?limit=10" \
+  -H "Authorization: Bearer <id-token>"
 ```
 
 ### Step 3: Retrieve Patient Details
 ```bash
-curl -X GET https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000
+curl -X GET https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer <id-token>"
 ```
 
 ### Step 3.5: Retrieve Queue Stats
 ```bash
-curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue/stats?date=2026-06-24"
+curl -X GET "https://<api-id>.execute-api.us-west-2.amazonaws.com/queue/stats?date=2026-06-24" \
+  -H "Authorization: Bearer <id-token>"
 ```
 
 ### Step 4: Override or Confirm Priority
@@ -483,6 +538,7 @@ If AI triage suggest MEDIUM, and you want to escalate to HIGH:
 ```bash
 curl -X PATCH https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000/priority \
   -H "content-type: application/json" \
+  -H "Authorization: Bearer <id-token>" \
   -d '{
     "confirmedPriority": "HIGH",
     "overrideReason": "Patient condition requires faster staff attention."
@@ -495,6 +551,7 @@ Escalate a WAITING patient's priority to HIGH:
 ```bash
 curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000/escalate \
   -H "content-type: application/json" \
+  -H "Authorization: Bearer <id-token>" \
   -d '{
     "reviewerDisplayName": "Dr. Smith"
   }'
@@ -505,6 +562,7 @@ curl -X POST https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8
 ```bash
 curl -X PATCH https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000/status \
   -H "content-type: application/json" \
+  -H "Authorization: Bearer <id-token>" \
   -d '{
     "status": "IN_PROGRESS"
   }'
@@ -514,6 +572,7 @@ curl -X PATCH https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e
 ```bash
 curl -X PATCH https://<api-id>.execute-api.us-west-2.amazonaws.com/patients/550e8400-e29b-41d4-a716-446655440000/status \
   -H "content-type: application/json" \
+  -H "Authorization: Bearer <id-token>" \
   -d '{
     "status": "COMPLETED"
   }'

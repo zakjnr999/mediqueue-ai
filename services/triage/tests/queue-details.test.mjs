@@ -648,7 +648,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       nowFn: fixedNow
     };
 
-    const res = await getQueueHandler({}, mockDeps);
+    const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
 
@@ -658,7 +658,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
 
     // Missing table name returns 500 CONFIGURATION_ERROR
     delete process.env.PATIENTS_TABLE_NAME;
-    const errRes = await getQueueHandler({}, mockDeps);
+    const errRes = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
     assert.equal(errRes.statusCode, 500);
     const errBody = JSON.parse(errRes.body);
     assert.equal(errBody.success, false);
@@ -674,6 +674,9 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
     };
 
     const event = {
+      headers: {
+        Authorization: 'Bearer mock-token-test@hospital.com'
+      },
       pathParameters: {
         patientId: validUUID
       }
@@ -707,7 +710,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
         nowFn: fixedNow
       };
 
-      const res = await getQueueHandler({}, mockDeps);
+      const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);
@@ -749,6 +752,9 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       };
 
       const event = {
+        headers: {
+          Authorization: 'Bearer mock-token-test@hospital.com'
+        },
         pathParameters: {
           patientId: validUUID
         }
@@ -799,7 +805,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
         nowFn: fixedNow
       };
 
-      const res = await getQueueHandler({}, mockDeps);
+      const res = await getQueueHandler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' } }, mockDeps);
       assert.equal(res.statusCode, 500);
       const body = JSON.parse(res.body);
       assert.equal(body.success, false);

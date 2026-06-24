@@ -129,7 +129,7 @@ test('Queue Stats - Handler Behaviour', async (t) => {
       ]
     };
 
-    const res = await handler({ queryStringParameters: { date: '2026-06-24' } }, mockDeps);
+    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: { date: '2026-06-24' } }, mockDeps);
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
 
@@ -148,7 +148,7 @@ test('Queue Stats - Handler Behaviour', async (t) => {
     delete process.env.PATIENTS_TABLE_NAME;
     delete process.env.PATIENTS_QUEUE_INDEX_NAME;
 
-    const res = await handler({ queryStringParameters: {} });
+    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: {} });
     assert.equal(res.statusCode, 500);
 
     const body = JSON.parse(res.body);
@@ -166,7 +166,7 @@ test('Queue Stats - Handler Behaviour', async (t) => {
       }
     };
 
-    const res = await handler({ queryStringParameters: {} }, mockDeps);
+    const res = await handler({ headers: { Authorization: 'Bearer mock-token-test@hospital.com' }, queryStringParameters: {} }, mockDeps);
     assert.equal(res.statusCode, 500);
 
     const body = JSON.parse(res.body);

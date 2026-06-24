@@ -181,6 +181,7 @@ test('Escalation - Handler Behaviour', async (t) => {
     };
 
     const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: JSON.stringify({ reviewerDisplayName: 'Nurse Rhoda' })
     };
@@ -198,6 +199,7 @@ test('Escalation - Handler Behaviour', async (t) => {
   await t.test('returns 500 when table configuration is missing', async () => {
     delete process.env.PATIENTS_TABLE_NAME;
     const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: JSON.stringify({ reviewerDisplayName: 'Nurse Rhoda' })
     };
@@ -220,6 +222,7 @@ test('Escalation - Handler Behaviour', async (t) => {
     };
 
     const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
       pathParameters: { patientId: validUUID },
       body: JSON.stringify({ reviewerDisplayName: 'Nurse Rhoda' })
     };
