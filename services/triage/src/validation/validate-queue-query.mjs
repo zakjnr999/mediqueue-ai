@@ -15,7 +15,7 @@ export function validateQueueQuery(queryParams) {
   }
 
   // Reject unexpected query parameters
-  const allowedKeys = ['date', 'limit', 'nextToken'];
+  const allowedKeys = ['date', 'limit', 'nextToken', 'status', 'hasRedFlags'];
   const actualKeys = Object.keys(queryParams);
   for (const key of actualKeys) {
     if (!allowedKeys.includes(key)) {
@@ -67,6 +67,35 @@ export function validateQueueQuery(queryParams) {
     normalized.nextToken = trimmedToken;
   } else {
     normalized.nextToken = null;
+  }
+
+  // Validate status filter (optional)
+  const ALLOWED_STATUS_VALUES = ['WAITING', 'IN_PROGRESS', 'COMPLETED'];
+  if (queryParams.status !== undefined && queryParams.status !== null) {
+    if (typeof queryParams.status !== 'string') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'Parameter "status" must be a string');
+    }
+    const trimmedStatus = queryParams.status.trim();
+    if (!ALLOWED_STATUS_VALUES.includes(trimmedStatus)) {
+      throw new ApiError('VALIDATION_ERROR', 400, 'Parameter "status" must be one of: WAITING, IN_PROGRESS, COMPLETED');
+    }
+    normalized.status = trimmedStatus;
+  } else {
+    normalized.status = null;
+  }
+
+  // Validate hasRedFlags filter (optional)
+  if (queryParams.hasRedFlags !== undefined && queryParams.hasRedFlags !== null) {
+    if (typeof queryParams.hasRedFlags !== 'string') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'Parameter "hasRedFlags" must be a string');
+    }
+    const trimmedFlags = queryParams.hasRedFlags.trim();
+    if (trimmedFlags !== 'true' && trimmedFlags !== 'false') {
+      throw new ApiError('VALIDATION_ERROR', 400, 'Parameter "hasRedFlags" must be "true" or "false"');
+    }
+    normalized.hasRedFlags = trimmedFlags === 'true';
+  } else {
+    normalized.hasRedFlags = null;
   }
 
   return normalized;

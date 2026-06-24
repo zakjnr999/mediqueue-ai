@@ -30,7 +30,8 @@ function createValidPatient(overrides = {}) {
       confirmedPriority: null,
       reviewedBy: null,
       reviewedAt: null,
-      overrideReason: null
+      overrideReason: null,
+      reviewerDisplayName: null
     },
     status: 'WAITING',
     createdAt: '2026-06-23T14:30:00.000Z',
@@ -116,6 +117,30 @@ test('Staff Actions - Input Validation Tests', async (t) => {
     assert.equal(originalBody.confirmedPriority, 'MEDIUM ');
   });
 
+  await t.test('Priority - reviewedBy is rejected from client input', () => {
+    assert.throws(
+      () => validatePriorityUpdate({ confirmedPriority: 'MEDIUM', reviewedBy: 'Dr. Smith' }, 'MEDIUM'),
+      (err) => err.code === 'VALIDATION_ERROR'
+    );
+  });
+
+  await t.test('Priority - reviewerDisplayName is accepted and normalized', () => {
+    const res = validatePriorityUpdate({ confirmedPriority: 'MEDIUM', reviewerDisplayName: '  Dr. Smith  ' }, 'MEDIUM');
+    assert.equal(res.reviewerDisplayName, 'Dr. Smith');
+  });
+
+  await t.test('Priority - reviewerDisplayName is null when absent', () => {
+    const res = validatePriorityUpdate({ confirmedPriority: 'MEDIUM' }, 'MEDIUM');
+    assert.equal(res.reviewerDisplayName, null);
+  });
+
+  await t.test('Priority - reviewerDisplayName longer than 100 characters is rejected', () => {
+    assert.throws(
+      () => validatePriorityUpdate({ confirmedPriority: 'MEDIUM', reviewerDisplayName: 'a'.repeat(101) }, 'MEDIUM'),
+      (err) => err.code === 'VALIDATION_ERROR'
+    );
+  });
+
   await t.test('Status - WAITING validation passes', () => {
     const res = validateStatusUpdate({ status: 'WAITING' });
     assert.equal(res.status, 'WAITING');
@@ -151,6 +176,7 @@ test('Staff Actions - Service Operations Tests', async (t) => {
       updatePatientPriorityFn: async (id, params) => {
         assert.equal(params.confirmedPriority, 'MEDIUM');
         assert.equal(params.overrideReason, null);
+        assert.equal(params.reviewerDisplayName, null);
         assert.equal(params.expectedUpdatedAt, patient.updatedAt);
         assert.equal(params.reviewedAt, fixedNow().toISOString());
         return {
@@ -159,7 +185,8 @@ test('Staff Actions - Service Operations Tests', async (t) => {
             confirmedPriority: 'MEDIUM',
             reviewedAt: params.reviewedAt,
             reviewedBy: null,
-            overrideReason: null
+            overrideReason: null,
+            reviewerDisplayName: null
           },
           updatedAt: params.updatedAt
         };
@@ -172,6 +199,7 @@ test('Staff Actions - Service Operations Tests', async (t) => {
     assert.equal(res.aiSuggestedPriority, 'MEDIUM');
     assert.equal(res.staffDecision.confirmedPriority, 'MEDIUM');
     assert.equal(res.staffDecision.overrideReason, null);
+    assert.equal(res.staffDecision.reviewerDisplayName, null);
     assert.equal(res.status, 'WAITING');
     assert.equal(res.updatedAt, fixedNow().toISOString());
 
@@ -181,6 +209,32 @@ test('Staff Actions - Service Operations Tests', async (t) => {
     assert.ok(!resKeys.includes('entityType'));
     assert.ok(!resKeys.includes('fullName'));
     assert.ok(!resKeys.includes('phoneNumber'));
+  });
+
+  await t.test('Priority - successful confirmation with reviewerDisplayName', async () => {
+    const patient = createValidPatient();
+    const deps = {
+      getPatientDetailsFn: async () => patient,
+      updatePatientPriorityFn: async (id, params) => {
+        assert.equal(params.confirmedPriority, 'MEDIUM');
+        assert.equal(params.reviewerDisplayName, 'Dr. Smith');
+        return {
+          ...patient,
+          staffDecision: {
+            confirmedPriority: 'MEDIUM',
+            reviewedAt: params.reviewedAt,
+            reviewedBy: null,
+            overrideReason: null,
+            reviewerDisplayName: 'Dr. Smith'
+          },
+          updatedAt: params.updatedAt
+        };
+      },
+      nowFn: fixedNow
+    };
+
+    const res = await updatePriorityService(validUUID, { confirmedPriority: 'MEDIUM', reviewerDisplayName: 'Dr. Smith' }, deps);
+    assert.equal(res.staffDecision.reviewerDisplayName, 'Dr. Smith');
   });
 
   await t.test('Priority - missing patient returns PATIENT_NOT_FOUND', async () => {
@@ -349,6 +403,7 @@ test('Staff Actions - Repository Tests', async (t) => {
         assert.equal(input.ExpressionAttributeValues[':checkinEntityType'], 'PATIENT_CHECKIN');
         assert.equal(input.ExpressionAttributeValues[':expectedUpdatedAt'], '2026-06-23T14:30:00.000Z');
         assert.equal(input.ExpressionAttributeValues[':rb'], null); // reviewedBy is always null
+        assert.equal(input.ExpressionAttributeValues[':rdn'], 'Dr. Smith'); // reviewerDisplayName passed through
         assert.equal(input.ReturnValues, 'ALL_NEW');
         return { Attributes: { patientId: validUUID, status: 'WAITING' } };
       }
@@ -357,6 +412,7 @@ test('Staff Actions - Repository Tests', async (t) => {
     const res = await updatePatientPriority(mockDocClient, 'MockTable', validUUID, {
       confirmedPriority: 'HIGH',
       overrideReason: 'Override',
+      reviewerDisplayName: 'Dr. Smith',
       reviewedAt: '2026-06-23T16:00:00.000Z',
       expectedUpdatedAt: '2026-06-23T14:30:00.000Z',
       updatedAt: '2026-06-23T16:00:00.000Z'

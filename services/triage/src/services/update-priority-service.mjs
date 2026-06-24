@@ -60,6 +60,7 @@ export async function updatePriorityService(patientId, body, deps = {}) {
   const updatedItem = await updatePatientPriorityFn(normalizedId, {
     confirmedPriority: normalizedInput.confirmedPriority,
     overrideReason: normalizedInput.overrideReason,
+    reviewerDisplayName: normalizedInput.reviewerDisplayName,
     reviewedAt: timestampStr,
     expectedUpdatedAt: patient.updatedAt,
     updatedAt: timestampStr
@@ -73,7 +74,8 @@ export async function updatePriorityService(patientId, body, deps = {}) {
     staffDecision: {
       confirmedPriority: updatedItem.staffDecision?.confirmedPriority || null,
       reviewedAt: updatedItem.staffDecision?.reviewedAt || null,
-      overrideReason: updatedItem.staffDecision?.overrideReason !== undefined ? updatedItem.staffDecision.overrideReason : null
+      overrideReason: updatedItem.staffDecision?.overrideReason !== undefined ? updatedItem.staffDecision.overrideReason : null,
+      reviewerDisplayName: updatedItem.staffDecision?.reviewerDisplayName !== undefined ? updatedItem.staffDecision.reviewerDisplayName : null
     },
     status: updatedItem.status || 'WAITING',
     updatedAt: updatedItem.updatedAt || ''

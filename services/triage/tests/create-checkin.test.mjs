@@ -69,6 +69,7 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
     });
 
     // Verify response structure (excludes PII like fullName/phoneNumber and DynamoDB keys/GSI keys)
+    // Also confirms sex/selfAssessedUrgency are NOT in response when not provided
     assert.deepEqual(response, {
       patientId: 'mock-uuid-1234',
       queueNumber: 'MQ-20260623-0005',
@@ -82,6 +83,51 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
       },
       createdAt: '2026-06-23T14:30:00.000Z'
     });
+    // Confirm sensitive fields are absent when not provided
+    assert.ok(!('sex' in response));
+    assert.ok(!('selfAssessedUrgency' in response));
+  });
+
+  await t.test('1b. Check-in with sex and selfAssessedUrgency stores and returns them', async () => {
+    let saveCalled = false;
+    let savedItem = null;
+
+    const request = {
+      ...validRequest,
+      sex: 'Male',
+      selfAssessedUrgency: 'Urgent'
+    };
+
+    const deps = {
+      analyseSymptomsFn: async (symptomData) => {
+        // Verify Bedrock does NOT receive sex or selfAssessedUrgency
+        assert.ok(!('sex' in symptomData));
+        assert.ok(!('selfAssessedUrgency' in symptomData));
+        return {
+          summary: 'Patient has fever and headache.',
+          redFlags: [],
+          suggestedPriority: 'MEDIUM',
+          reason: 'concerning symptoms',
+          requiresImmediateStaffReview: true
+        };
+      },
+      generateQueueNumberFn: async () => 'MQ-20260623-0006',
+      savePatientFn: async (item) => {
+        saveCalled = true;
+        savedItem = item;
+        // Verify sex and selfAssessedUrgency are stored
+        assert.equal(item.sex, 'Male');
+        assert.equal(item.selfAssessedUrgency, 'Urgent');
+      },
+      generateIdFn: fixedId,
+      nowFn: fixedNow
+    };
+
+    const response = await createCheckinService(request, deps);
+    assert.ok(saveCalled);
+    // Verify sex and selfAssessedUrgency appear in the check-in response
+    assert.equal(response.sex, 'Male');
+    assert.equal(response.selfAssessedUrgency, 'Urgent');
   });
 
   await t.test('2. Missing or empty fields in request throws validation error', () => {
@@ -89,6 +135,34 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
     assert.throws(() => validateCheckinRequest(invalid), (err) => {
       return err instanceof CheckinError && err.code === 'VALIDATION_ERROR' && err.statusCode === 400;
     });
+  });
+
+  await t.test('2b. Invalid sex value is rejected', () => {
+    const invalid = { ...validRequest, sex: 'InvalidSex' };
+    assert.throws(() => validateCheckinRequest(invalid), (err) => {
+      return err instanceof CheckinError && err.code === 'VALIDATION_ERROR';
+    });
+  });
+
+  await t.test('2c. Invalid selfAssessedUrgency value is rejected', () => {
+    const invalid = { ...validRequest, selfAssessedUrgency: 'VeryUrgent' };
+    assert.throws(() => validateCheckinRequest(invalid), (err) => {
+      return err instanceof CheckinError && err.code === 'VALIDATION_ERROR';
+    });
+  });
+
+  await t.test('2d. Valid sex values are accepted', () => {
+    for (const value of ['Male', 'Female', 'Prefer not to say']) {
+      const res = validateCheckinRequest({ ...validRequest, sex: value });
+      assert.equal(res.sex, value);
+    }
+  });
+
+  await t.test('2e. Valid selfAssessedUrgency values are accepted', () => {
+    for (const value of ['Minor', 'Moderate', 'Urgent']) {
+      const res = validateCheckinRequest({ ...validRequest, selfAssessedUrgency: value });
+      assert.equal(res.selfAssessedUrgency, value);
+    }
   });
 
   await t.test('3. Unexpected properties are rejected', () => {
@@ -311,6 +385,8 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
     assert.ok(!keys.includes('gsi1pk'));
     assert.ok(!keys.includes('gsi1sk'));
     assert.ok(!keys.includes('staffDecision'));
+    assert.ok(!keys.includes('sex')); // absent when not provided
+    assert.ok(!keys.includes('selfAssessedUrgency')); // absent when not provided
   });
 
   await t.test('16. Handler - known CheckinError is mapped to code and status', async () => {

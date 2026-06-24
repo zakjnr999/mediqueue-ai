@@ -8,8 +8,8 @@ import { ApiError } from '../errors/api-error.mjs';
  * @param {object} queryParams - Raw query parameters from the HTTP request
  * @param {object} deps - Injected dependencies for testability
  * @param {Function} deps.queryPatientQueueFn - (params) => Promise<{items, lastEvaluatedKey}>
- * @param {Function} deps.serializeTokenFn - (key, date) => string
- * @param {Function} deps.deserializeTokenFn - (token, date) => object
+ * @param {Function} deps.serializeTokenFn - (key, date, filters) => string
+ * @param {Function} deps.deserializeTokenFn - (token, date, requestedFilters) => object
  * @param {Function} [deps.nowFn] - () => Date
  * @returns {Promise<object>} Staff queue payload
  * @throws {ApiError}
@@ -21,7 +21,7 @@ export async function getQueueService(queryParams, deps = {}) {
     throw new ApiError('INTERNAL_ERROR', 500, 'Required operations not injected into service');
   }
 
-  // 1. Validate parameters
+  // 1. Validate parameters and get normalized object
   const normalized = validateQueueQuery(queryParams);
 
   // 2. Adjust UTC date fallback to support nowFn injection
@@ -30,13 +30,22 @@ export async function getQueueService(queryParams, deps = {}) {
     normalized.date = now.toISOString().slice(0, 10);
   }
 
-  // 3. Deserialize token if present
-  let exclusiveStartKey = null;
-  if (normalized.nextToken) {
-    exclusiveStartKey = deserializeTokenFn(normalized.nextToken, normalized.date);
+  // 3. Build filter context for pagination binding
+  const requestedFilters = {};
+  if (normalized.status !== null) {
+    requestedFilters.status = normalized.status;
+  }
+  if (normalized.hasRedFlags !== null) {
+    requestedFilters.hasRedFlags = normalized.hasRedFlags;
   }
 
-  // 4. Query patient repository
+  // 4. Deserialize token if present (passes filter context for validation)
+  let exclusiveStartKey = null;
+  if (normalized.nextToken) {
+    exclusiveStartKey = deserializeTokenFn(normalized.nextToken, normalized.date, requestedFilters);
+  }
+
+  // 5. Query patient repository
   let results;
   try {
     results = await queryPatientQueueFn({
@@ -48,9 +57,24 @@ export async function getQueueService(queryParams, deps = {}) {
     throw err;
   }
 
-  // 5. Filter and map items
+  // 6. Filter and map items
   const filteredPatients = results.items
     .filter(item => item && item.entityType === 'PATIENT_CHECKIN')
+    // Apply in-memory status filter if requested
+    .filter(item => {
+      if (normalized.status === null) return true;
+      return item.status === normalized.status;
+    })
+    // Apply in-memory hasRedFlags filter if requested
+    .filter(item => {
+      if (normalized.hasRedFlags === null) return true;
+      const ai = item.aiAssessment || {};
+      const redFlags = Array.isArray(ai.redFlags) ? ai.redFlags : [];
+      if (normalized.hasRedFlags === true) {
+        return redFlags.length > 0;
+      }
+      return redFlags.length === 0;
+    })
     .map(item => {
       // Safely fetch aiAssessment
       const ai = item.aiAssessment || {};
@@ -80,8 +104,8 @@ export async function getQueueService(queryParams, deps = {}) {
       };
     });
 
-  // 6. Serialize lastEvaluatedKey into opaque nextToken
-  const nextToken = serializeTokenFn(results.lastEvaluatedKey, normalized.date);
+  // 7. Serialize lastEvaluatedKey into opaque nextToken (includes active filter context)
+  const nextToken = serializeTokenFn(results.lastEvaluatedKey, normalized.date, requestedFilters);
 
   return {
     date: normalized.date,

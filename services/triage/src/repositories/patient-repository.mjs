@@ -119,13 +119,14 @@ export async function getPatientDetails(docClient, tableName, patientId) {
  * @param {object} params
  * @param {string} params.confirmedPriority - HIGH, MEDIUM, LOW
  * @param {string|null} params.overrideReason - string or null
+ * @param {string|null} params.reviewerDisplayName - Display name of reviewer, or null
  * @param {string} params.reviewedAt - ISO timestamp
  * @param {string} params.expectedUpdatedAt - Expect stored updatedAt to match this
  * @param {string} params.updatedAt - ISO timestamp (same as reviewedAt)
  * @returns {Promise<object>} Updated patient record
  * @throws {ApiError}
  */
-export async function updatePatientPriority(docClient, tableName, patientId, { confirmedPriority, overrideReason, reviewedAt, expectedUpdatedAt, updatedAt }) {
+export async function updatePatientPriority(docClient, tableName, patientId, { confirmedPriority, overrideReason, reviewerDisplayName, reviewedAt, expectedUpdatedAt, updatedAt }) {
   if (!tableName || tableName.trim() === '') {
     throw new ApiError('CONFIGURATION_ERROR', 500, 'Database table name configuration is missing');
   }
@@ -136,7 +137,7 @@ export async function updatePatientPriority(docClient, tableName, patientId, { c
       Key: {
         id: `PATIENT#${patientId}`
       },
-      UpdateExpression: 'SET staffDecision.confirmedPriority = :cp, staffDecision.reviewedAt = :ra, staffDecision.reviewedBy = :rb, staffDecision.overrideReason = :or, #updatedAt = :ua',
+      UpdateExpression: 'SET staffDecision.confirmedPriority = :cp, staffDecision.reviewedAt = :ra, staffDecision.reviewedBy = :rb, staffDecision.reviewerDisplayName = :rdn, staffDecision.overrideReason = :or, #updatedAt = :ua',
       ConditionExpression: 'attribute_exists(id) AND entityType = :checkinEntityType AND #updatedAt = :expectedUpdatedAt',
       ExpressionAttributeNames: {
         '#updatedAt': 'updatedAt'
@@ -145,6 +146,7 @@ export async function updatePatientPriority(docClient, tableName, patientId, { c
         ':cp': confirmedPriority,
         ':ra': reviewedAt,
         ':rb': null,
+        ':rdn': reviewerDisplayName !== undefined ? reviewerDisplayName : null,
         ':or': overrideReason,
         ':ua': updatedAt,
         ':checkinEntityType': 'PATIENT_CHECKIN',

@@ -30,7 +30,9 @@ Submits a clinical check-in ticket.
     "age": 35,
     "phoneNumber": "0201112222",
     "symptoms": ["Shortness of breath", "Chest tightness"],
-    "additionalDetails": "Symptoms started during exercise."
+    "additionalDetails": "Symptoms started during exercise.",
+    "sex": "Male",
+    "selfAssessedUrgency": "Urgent"
   }
   ```
 * **Success Response (HTTP 201)**:
@@ -48,13 +50,15 @@ Submits a clinical check-in ticket.
         "reason": "Red flag symptoms require immediate review.",
         "requiresImmediateStaffReview": true
       },
+      "sex": "Male",
+      "selfAssessedUrgency": "Urgent",
       "createdAt": "2026-06-24T00:00:00.000Z"
     }
   }
   ```
 * **Controlled Error Codes**:
   * `400 INVALID_JSON` (Malformed body payload)
-  * `400 VALIDATION_ERROR` (Invalid age range, empty symptoms list, text length violations)
+  * `400 VALIDATION_ERROR` (Invalid age range, empty symptoms list, invalid sex/urgency value, text length violations)
   * `500 TRIAGE_PROCESSING_ERROR` (Bedrock model invocation failure)
   * `500 QUEUE_NUMBER_ERROR` (Counter sequence failure)
   * `500 DATABASE_ERROR` (Conditional put conflict or AWS network drop)
@@ -67,8 +71,10 @@ Queries patients listed on the staff dashboard queue for a specific day.
 * **Query Parameters**:
   * `date` (Optional): `YYYY-MM-DD` (defaults to current UTC date).
   * `limit` (Optional): Integer between 1 and 50 (defaults to 20).
-  * `nextToken` (Optional): Base64url encoded opaque pagination token.
-* **Public Attributes Returned**: Only maps queue-relevant fields. Excludes PII details (`fullName` and `phoneNumber` are projects of GSI index and are mapped, but `symptoms`, `additionalDetails`, and DynamoDB keys are stripped).
+  * `nextToken` (Optional): Base64url encoded opaque pagination token (v2 — bound to active filters).
+  * `status` (Optional): Filter by `WAITING`, `IN_PROGRESS`, or `COMPLETED` (in-memory).
+  * `hasRedFlags` (Optional): `"true"` or `"false"` to filter by presence of red flags (in-memory).
+* **Public Attributes Returned**: Only maps queue-relevant fields. Excludes PII details (`fullName` and `phoneNumber` are projects of GSI index and are mapped, but `symptoms`, `additionalDetails`, `sex`, `selfAssessedUrgency`, and DynamoDB keys are stripped).
 * **Success Response (HTTP 200)**:
   ```json
   {
@@ -94,7 +100,7 @@ Queries patients listed on the staff dashboard queue for a specific day.
           "createdAt": "2026-06-24T00:00:00.000Z"
         }
       ],
-      "nextToken": "eyJ2IjoxLCJkYXRlIjoiMjAyNi0wNi0yNCIsImtleSI6e319"
+      "nextToken": "eyJ2IjoyLCJkYXRlIjoiMjAyNi0wNi0yNCIsImZpbHRlcnMiOnt9LCJrZXkiOnt9fQ"
     }
   }
   ```
@@ -104,6 +110,7 @@ Queries patients listed on the staff dashboard queue for a specific day.
 ### 2.3 GET `/patients/{patientId}`
 Retrieves a detailed view card of a patient's symptoms and triage details.
 * **Strong Consistency**: Uses `GetCommand` with `ConsistentRead: true` directly against the base table partition key to retrieve the latest status.
+* **Sensitive Fields Included**: `sex`, `selfAssessedUrgency`, and `reviewerDisplayName` are included here (patient details only), omitted from the queue list.
 * **Success Response (HTTP 200)**:
   ```json
   {
@@ -116,6 +123,8 @@ Retrieves a detailed view card of a patient's symptoms and triage details.
       "phoneNumber": "0201112222",
       "symptoms": ["Shortness of breath", "Chest tightness"],
       "additionalDetails": "Symptoms started during exercise.",
+      "sex": "Male",
+      "selfAssessedUrgency": "Urgent",
       "aiAssessment": {
         "summary": "Patient reports shortness of breath...",
         "redFlags": ["Shortness of breath", "Chest tightness"],
@@ -127,7 +136,8 @@ Retrieves a detailed view card of a patient's symptoms and triage details.
         "confirmedPriority": null,
         "reviewedBy": null,
         "reviewedAt": null,
-        "overrideReason": null
+        "overrideReason": null,
+        "reviewerDisplayName": null
       },
       "status": "WAITING",
       "createdAt": "2026-06-24T00:00:00.000Z",
@@ -144,12 +154,15 @@ Retrieves a detailed view card of a patient's symptoms and triage details.
 ### 2.4 PATCH `/patients/{patientId}/priority`
 Saves staff priority decision and comments.
 * **Override Rule**: `overrideReason` is **required** if the staff `confirmedPriority` differs from `aiAssessment.suggestedPriority`. It is optional and normalized to `null` if the priorities match.
+  * `reviewerDisplayName` (Optional): Display name of the reviewing staff member (max 100 chars). Stored unverified.
+  * `reviewedBy` is **rejected** from client input (reserved for future auth scoping).
 * **Concurrency Check**: Employs optimistic locking. Compares the stored `updatedAt` value fetched during consistent read against the conditional write. If another user commits an update first, it throws `UPDATE_CONFLICT` (HTTP 409).
 * **Sample Request**:
   ```json
   {
     "confirmedPriority": "HIGH",
-    "overrideReason": "Patient condition requires faster staff attention."
+    "overrideReason": "Patient condition requires faster staff attention.",
+    "reviewerDisplayName": "Dr. Smith"
   }
   ```
 * **Success Response (HTTP 200)**:
@@ -163,7 +176,8 @@ Saves staff priority decision and comments.
       "staffDecision": {
         "confirmedPriority": "HIGH",
         "reviewedAt": "2026-06-24T00:10:00.000Z",
-        "overrideReason": "Patient condition requires faster staff attention."
+        "overrideReason": "Patient condition requires faster staff attention.",
+        "reviewerDisplayName": "Dr. Smith"
       },
       "status": "WAITING",
       "updatedAt": "2026-06-24T00:10:00.000Z"
@@ -171,7 +185,7 @@ Saves staff priority decision and comments.
   }
   ```
 * **Controlled Error Codes**:
-  * `400 VALIDATION_ERROR` (Invalid priority string, reason exceeds 500 characters)
+  * `400 VALIDATION_ERROR` (Invalid priority string, reason exceeds 500 chars, reviewerDisplayName exceeds 100 chars)
   * `400 PRIORITY_OVERRIDE_REASON_REQUIRED` (Omitted override reason on priority changes)
   * `409 UPDATE_CONFLICT` (Concurrency timestamp mismatch)
 
@@ -221,6 +235,9 @@ Deploy a single DynamoDB table matching the primary key schema and index definit
 * `fullName` (String, max 100 characters)
 * `age` (Number, 0 to 120 integer)
 * `phoneNumber` (String, **Optional**, trimmed string)
+* `additionalDetails` (String, **Optional**, max 1000 characters)
+* `sex` (String, **Optional**: `Male`, `Female`, `Prefer not to say` — sensitive, excluded from GSI projection)
+* `selfAssessedUrgency` (String, **Optional**: `Minor`, `Moderate`, `Urgent` — patient self-report, excluded from GSI projection)
 * `symptoms` (Array of Strings, 1 to 20 entries)
 * `additionalDetails` (String, **Optional**, max 1000 characters)
 * `queueDate` (String, date reference, `YYYY-MM-DD`)
@@ -237,6 +254,7 @@ Deploy a single DynamoDB table matching the primary key schema and index definit
   * `reviewedBy` (String/null, always null for this milestone)
   * `reviewedAt` (String/null, ISO format)
   * `overrideReason` (String/null)
+  * `reviewerDisplayName` (String/null, unverified display label, max 100 chars)
 * `status` (String: `WAITING`, `IN_PROGRESS`, `COMPLETED`)
 * `createdAt` (String, ISO timestamp)
 * `updatedAt` (String, ISO timestamp)
@@ -254,6 +272,7 @@ Deploy a single DynamoDB table matching the primary key schema and index definit
 * **Sort Key**: `gsi1sk` (String)
 * **Projection Type**: `INCLUDE`
 * **Projected Attributes**: `entityType`, `patientId`, `queueNumber`, `fullName`, `age`, `status`, `aiAssessment`, `staffDecision`, `createdAt`
+  * **Note**: `sex` and `selfAssessedUrgency` are intentionally excluded from GSI projection (sensitive fields, patient-details only).
 * **Queue Order Behavior**: Querying by `gsi1pk = QUEUE#YYYY-MM-DD` and sorting ascending (ScanIndexForward = true) returns patients ordered by check-in time (First-Come, First-Served).
 
 ---
