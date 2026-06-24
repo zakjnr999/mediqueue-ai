@@ -8,6 +8,7 @@
     "test:triage": "node --test tests/triage-validation.test.mjs",
     "test:checkin": "node --test tests/create-checkin.test.mjs",
     "test:queue": "node --test tests/queue-details.test.mjs",
+    "test:staff-actions": "node --test tests/staff-actions.test.mjs",
     "test:bedrock": "node bedrock-test.mjs"
   },
   "keywords": [],

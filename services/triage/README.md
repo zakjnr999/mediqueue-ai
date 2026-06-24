@@ -76,7 +76,7 @@ services/triage/
 
 ## Environment Variables
 
-Copy `.env.example` to `.env`. The following environment variables are required:
+The following environment variables are required:
 
 | Variable | Description | Example / Placeholder |
 | :--- | :--- | :--- |
@@ -175,6 +175,64 @@ Retrieves the full check-in record details.
 }
 ```
 
+### 4. PATCH `/patients/{patientId}/priority` (Staff Priority Review)
+Updates the triage priority confirmed by staff.
+- **Request Body**:
+```json
+{
+  "confirmedPriority": "HIGH",
+  "overrideReason": "Patient condition requires faster staff attention."
+}
+```
+- **Rules**:
+  - `confirmedPriority` must be string and one of `HIGH`, `MEDIUM`, `LOW`.
+  - `overrideReason` is required if `confirmedPriority` differs from `aiAssessment.suggestedPriority` (trimmed string, max 500 chars). Normalizes to `null` if empty/omitted and priority matches.
+  - Concurrency Check: Update is conditional on `updatedAt` matching the timestamp retrieved during consistent read.
+  - `staffDecision.reviewedBy` is set to `null` for this milestone.
+- **Response Payload**:
+```json
+{
+  "success": true,
+  "data": {
+    "patientId": "e2ba9317-a02d-45db-9c3f-4e09f584fa71",
+    "queueNumber": "MQ-20260623-0001",
+    "aiSuggestedPriority": "MEDIUM",
+    "staffDecision": {
+      "confirmedPriority": "HIGH",
+      "reviewedAt": "2026-06-23T16:00:00.000Z",
+      "overrideReason": "Patient condition requires faster staff attention."
+    },
+    "status": "WAITING",
+    "updatedAt": "2026-06-23T16:00:00.000Z"
+  }
+}
+```
+
+### 5. PATCH `/patients/{patientId}/status` (Patient Status Update)
+Transitions the status of a patient in the hospital queue.
+- **Request Body**:
+```json
+{
+  "status": "IN_PROGRESS"
+}
+```
+- **Rules**:
+  - `status` must be WAITING, IN_PROGRESS, or COMPLETED.
+  - Forward-only transitions strictly enforced: `WAITING -> IN_PROGRESS` and `IN_PROGRESS -> COMPLETED`.
+  - Concurrency Check: Update is conditional on the stored `status` matching the expected status read before modification. Same-status updates throw `INVALID_STATUS_TRANSITION`.
+- **Response Payload**:
+```json
+{
+  "success": true,
+  "data": {
+    "patientId": "e2ba9317-a02d-45db-9c3f-4e09f584fa71",
+    "queueNumber": "MQ-20260623-0001",
+    "status": "IN_PROGRESS",
+    "updatedAt": "2026-06-23T16:05:00.000Z"
+  }
+}
+```
+
 ---
 
 ## Execution Instructions
@@ -185,11 +243,11 @@ npm install
 ```
 
 ### 1. Run All Offline Unit and Logic Tests
-Verify check-in, queue, details, validations, pagination tokens, and handler proxy logic offline using injected mock dependencies:
+Verify check-in, queue, details, validations, pagination tokens, priority reviews, status transitions, and handler proxy logic offline using injected mock dependencies:
 ```bash
 npm test
 ```
-*(Alternatively, run `npm run test:triage`, `npm run test:checkin`, or `npm run test:queue` to target specific test suites).*
+*(Alternatively, run `npm run test:triage`, `npm run test:checkin`, `npm run test:queue`, or `npm run test:staff-actions` to target specific test suites).*
 
 ---
 
@@ -197,3 +255,4 @@ npm test
 
 * **Request Idempotency**: Repeated check-in submissions by a client screen will allocate duplicate queue numbers and store duplicate records.
 * **Pagination Token Security**: Pagination tokens are validated and date-bound but are not cryptographically signed in this hackathon milestone.
+* **Staff Authentication**: No authentication or authorization is configured for staff endpoints in this milestone. reviewedBy remains null. Do not expose these endpoints publicly in production without configuring security scopes.
