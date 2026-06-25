@@ -289,16 +289,7 @@ test('Staff Handlers - Production Adapter Wiring and Error Safety Tests', async 
         if (command.input.UpdateExpression) {
           return { Attributes: { id: `PATIENT#${validUUID}`, entityType: 'PATIENT_CHECKIN', status: 'WAITING', updatedAt: '2026-06-23T14:30:00.000Z' } };
         }
-        return {
-          Item: {
-            id: `PATIENT#${validUUID}`,
-            entityType: 'PATIENT_CHECKIN',
-            status: 'WAITING',
-            updatedAt: '2026-06-23T14:30:00.000Z',
-            aiAssessment: { suggestedPriority: 'MEDIUM' },
-            staffDecision: {}
-          }
-        };
+        return { Item: { id: `PATIENT#${validUUID}`, entityType: 'PATIENT_CHECKIN', status: 'WAITING', updatedAt: '2026-06-23T14:30:00.000Z', suggestedPriority: 'MEDIUM' } };
       }
       if (command.input.IndexName) {
         return { Items: [] };
@@ -310,7 +301,7 @@ test('Staff Handlers - Production Adapter Wiring and Error Safety Tests', async 
       const res1 = await updatePriorityProdHandler({
         headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
         pathParameters: { patientId: validUUID },
-        body: JSON.stringify({ confirmedPriority: 'MEDIUM', reviewerDisplayName: 'Dr. Smith' })
+        body: JSON.stringify({ confirmedPriority: 'HIGH', reviewerDisplayName: 'Dr. Smith' })
       });
       assert.equal(res1.statusCode, 200);
 

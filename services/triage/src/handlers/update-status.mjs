@@ -38,6 +38,14 @@ export function createHandler(dependencies) {
   if (dependencies.getDocClientFn !== undefined && typeof dependencies.getDocClientFn !== 'function') {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
+  if (dependencies.getDocClientFn) {
+    const required = ['nowFn'];
+    for (const name of required) {
+      if (typeof dependencies[name] !== 'function') {
+        throw new Error(`Dependency "${name}" must be a function`);
+      }
+    }
+  }
 
   return async function handleRequest(event, context) {
     console.log('Status update request received');
@@ -91,7 +99,11 @@ export function createHandler(dependencies) {
           code: err.code,
           requestId: context?.awsRequestId,
         });
-        const safeMessage = (err.code === 'CONFIGURATION_ERROR' || err.code === 'DATABASE_ERROR')
+        const SAFE_INTERNAL_CODES = new Set([
+          'DATABASE_ERROR',
+          'CONFIGURATION_ERROR'
+        ]);
+        const safeMessage = SAFE_INTERNAL_CODES.has(err.code)
           ? 'Unable to process request'
           : err.message;
         return apiResponse(err.statusCode, {

@@ -963,7 +963,6 @@ test('GET /queue - Regression and Adapter Verification Tests', async (t) => {
     const handler = createGetQueueHandler({
       serviceFn: getQueueService,
       getDocClientFn: () => mockClient,
-      queryPatientQueueFn: queryPatientQueue,
       serializeTokenFn: serializeToken,
       deserializeTokenFn: deserializeToken,
       nowFn: fixedNow
@@ -1019,7 +1018,6 @@ test('GET /queue - Regression and Adapter Verification Tests', async (t) => {
     const handler = createGetQueueHandler({
       serviceFn: getQueueService,
       getDocClientFn: () => mockClient,
-      queryPatientQueueFn: queryPatientQueue,
       serializeTokenFn: serializeToken,
       deserializeTokenFn: deserializeToken,
       nowFn: fixedNow
