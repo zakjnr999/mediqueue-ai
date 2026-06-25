@@ -5,12 +5,14 @@ applications:
       phases:
         preBuild:
           commands:
+            - npx --version
+            - node --version
             - npm ci
         build:
           commands:
             - npm run build
       artifacts:
-        baseDirectory: .next
+        baseDirectory: ''
         files:
           - '**/*'
       cache:
