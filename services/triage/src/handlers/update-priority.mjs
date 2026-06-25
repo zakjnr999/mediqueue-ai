@@ -57,7 +57,7 @@ export function createHandler(dependencies) {
 
       // Validate table configuration early
       if (!tableName || tableName.trim() === '') {
-        throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+        throw new ApiError('CONFIGURATION_ERROR', 500, 'Unable to process request');
       }
 
       if (!event || event.body === undefined || event.body === null) {

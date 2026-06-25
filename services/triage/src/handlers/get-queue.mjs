@@ -59,7 +59,7 @@ export function createHandler(dependencies) {
 
       // Validate table and index configuration early
       if (!tableName || tableName.trim() === '' || !indexName || indexName.trim() === '') {
-        throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+        throw new ApiError('CONFIGURATION_ERROR', 500, 'Unable to process request');
       }
 
       const queryParams = event.queryStringParameters || {};
