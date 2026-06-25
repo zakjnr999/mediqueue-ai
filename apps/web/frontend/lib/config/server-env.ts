@@ -26,7 +26,9 @@ function requireEnv(name: string): string {
 }
 
 /**
- * The backend API Gateway base URL (server-side only).
- * Used by the Next.js API proxy route to forward requests.
+ * Returns the backend API Gateway base URL (server-side only).
+ * Read this at request time so Next.js builds do not require runtime env.
  */
-export const MEDIQUEUE_API_URL: string = requireEnv('MEDIQUEUE_API_URL');
+export function getMediqueueApiUrl(): string {
+  return requireEnv('MEDIQUEUE_API_URL');
+}

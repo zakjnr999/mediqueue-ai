@@ -8,7 +8,7 @@
  * Amplify Console under Environment variables (NOT as NEXT_PUBLIC_*).
  */
 
-import { MEDIQUEUE_API_URL } from '@/lib/config/server-env';
+import { getMediqueueApiUrl } from '@/lib/config/server-env';
 
 const PROXY_TIMEOUT_MS = 15_000;
 
@@ -62,7 +62,7 @@ async function handleRequest(request: Request, path: string[]): Promise<Response
   // Construct the target URL preserving the query string.
   const searchParams = new URL(request.url).search;
   const targetPath = `/${path.join('/')}${searchParams}`;
-  const targetUrl = `${MEDIQUEUE_API_URL.replace(/\/+$/, '')}${targetPath}`;
+  const targetUrl = `${getMediqueueApiUrl().replace(/\/+$/, '')}${targetPath}`;
 
   // Build forwarded headers.
   // We forward the original headers except for hop-by-hop headers that
