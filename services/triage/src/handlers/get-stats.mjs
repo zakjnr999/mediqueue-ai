@@ -38,14 +38,6 @@ export function createHandler(dependencies) {
   if (dependencies.getDocClientFn !== undefined && typeof dependencies.getDocClientFn !== 'function') {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
-  if (dependencies.getDocClientFn) {
-    const required = ['queryAllPatientsForDateFn', 'nowFn'];
-    for (const name of required) {
-      if (typeof dependencies[name] !== 'function') {
-        throw new Error(`Dependency "${name}" must be a function`);
-      }
-    }
-  }
 
   return async function handleRequest(event, context) {
     console.log('Stats request received');
@@ -58,7 +50,7 @@ export function createHandler(dependencies) {
 
       // Validate table/index configuration early
       if (!tableName || tableName.trim() === '' || !indexName || indexName.trim() === '') {
-        throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+        throw new ApiError('CONFIGURATION_ERROR', 500, 'Unable to process request');
       }
 
       const queryParams = event?.queryStringParameters || {};
@@ -84,11 +76,14 @@ export function createHandler(dependencies) {
           code: err.code,
           requestId: context?.awsRequestId,
         });
+        const safeMessage = (err.code === 'CONFIGURATION_ERROR' || err.code === 'DATABASE_ERROR')
+          ? 'Unable to process request'
+          : err.message;
         return apiResponse(err.statusCode, {
           success: false,
           error: {
             code: err.code,
-            message: err.message
+            message: safeMessage
           }
         });
       }
@@ -110,7 +105,6 @@ export function createHandler(dependencies) {
 const prodDeps = Object.freeze({
   serviceFn: getStatsService,
   getDocClientFn: getDocClient,
-  queryAllPatientsForDateFn: queryAllPatientsForDate,
   nowFn: () => new Date()
 });
 

@@ -39,14 +39,6 @@ export function createHandler(dependencies) {
   if (dependencies.getDocClientFn !== undefined && typeof dependencies.getDocClientFn !== 'function') {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
-  if (dependencies.getDocClientFn) {
-    const required = ['queryPatientQueueFn', 'serializeTokenFn', 'deserializeTokenFn', 'nowFn'];
-    for (const name of required) {
-      if (typeof dependencies[name] !== 'function') {
-        throw new Error(`Dependency "${name}" must be a function`);
-      }
-    }
-  }
 
   return async function handleRequest(event, context) {
     console.log('Queue request received');
@@ -59,7 +51,7 @@ export function createHandler(dependencies) {
 
       // Validate table and index configuration early
       if (!tableName || tableName.trim() === '' || !indexName || indexName.trim() === '') {
-        throw new ApiError('CONFIGURATION_ERROR', 500, 'Database configurations are missing');
+        throw new ApiError('CONFIGURATION_ERROR', 500, 'Unable to process request');
       }
 
       const queryParams = event.queryStringParameters || {};
@@ -69,18 +61,20 @@ export function createHandler(dependencies) {
 
       const client = dependencies.getDocClientFn ? dependencies.getDocClientFn() : null;
       const deps = {
-        queryPatientQueueFn: dependencies.getDocClientFn ? (async ({ dateStr, limit, exclusiveStartKey: startKey }) => {
-          return await queryPatientQueue(
-            client,
-            tableName,
-            indexName,
-            {
-              dateStr,
-              limit,
-              exclusiveStartKey: startKey
+        queryPatientQueueFn: dependencies.getDocClientFn
+          ? async ({ dateStr, limit, exclusiveStartKey: startKey }) => {
+              return await queryPatientQueue(
+                client,
+                tableName,
+                indexName,
+                {
+                  dateStr,
+                  limit,
+                  exclusiveStartKey: startKey
+                }
+              );
             }
-          );
-        }) : dependencies.queryPatientQueueFn,
+          : dependencies.queryPatientQueueFn,
         serializeTokenFn: dependencies.serializeTokenFn || serializeToken,
         deserializeTokenFn: dependencies.deserializeTokenFn || deserializeToken,
         nowFn: dependencies.nowFn || (() => new Date())
@@ -99,11 +93,14 @@ export function createHandler(dependencies) {
           code: err.code,
           requestId: context?.awsRequestId,
         });
+        const safeMessage = (err.code === 'CONFIGURATION_ERROR' || err.code === 'DATABASE_ERROR')
+          ? 'Unable to process request'
+          : err.message;
         return apiResponse(err.statusCode, {
           success: false,
           error: {
             code: err.code,
-            message: err.message
+            message: safeMessage
           }
         });
       }
@@ -125,7 +122,6 @@ export function createHandler(dependencies) {
 const prodDeps = Object.freeze({
   serviceFn: getQueueService,
   getDocClientFn: getDocClient,
-  queryPatientQueueFn: queryPatientQueue,
   serializeTokenFn: serializeToken,
   deserializeTokenFn: deserializeToken,
   nowFn: () => new Date()
