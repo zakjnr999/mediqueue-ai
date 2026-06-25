@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     return jsonError(400, 'VALIDATION_ERROR', 'Email and password are required.');
   }
 
-  const email = rawEmail.trim().toLowerCase();
+  const email = rawEmail.trim();
   if (!email || !password) {
     return jsonError(400, 'VALIDATION_ERROR', 'Email and password are required.');
   }
