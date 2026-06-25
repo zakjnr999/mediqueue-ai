@@ -78,9 +78,8 @@ export function StaffLogin({
         </form>
 
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-text-secondary">
-          <p className="font-semibold text-brand mb-1">Shift Demo Account:</p>
-          <p>Email: <code className="font-mono bg-slate-200 px-1 rounded">nurse@healthcentre.gh</code></p>
-          <p>Password: <code className="font-mono bg-slate-200 px-1 rounded">password123</code></p>
+          <p className="font-semibold text-brand mb-1">Clinical Staff Access:</p>
+          <p>Authenticate with your Cognito user pool credentials provided by your system administrator.</p>
         </div>
       </div>
     </div>

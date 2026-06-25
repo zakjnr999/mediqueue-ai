@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { apiPost, setIdToken } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
+import { ApiHttpError, ApiNetworkError } from '@/lib/api/errors';
+import type { LoginResponse } from '@/types/api';
 
 interface UseStaffAuthReturn {
   isLoggedIn: boolean;
@@ -14,10 +18,21 @@ interface UseStaffAuthReturn {
   handleLogout: () => void;
 }
 
+/** Decode a JWT payload without verification (client-side display only). */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+  } catch {
+    return null;
+  }
+}
+
 export function useStaffAuth(onLoginSuccess?: () => void): UseStaffAuthReturn {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [email, setEmail] = useState('nurse@healthcentre.gh');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -26,20 +41,50 @@ export function useStaffAuth(onLoginSuccess?: () => void): UseStaffAuthReturn {
     setLoginError('');
     setIsLoggingIn(true);
 
-    // Simulate auth delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      const response = await apiPost<LoginResponse>(
+        ENDPOINTS.auth.login,
+        { email, password },
+      );
 
-    if (email.trim() === 'nurse@healthcentre.gh' && password === 'password123') {
+      if (!response.success) {
+        setLoginError('Login failed. Please check your credentials.');
+        return;
+      }
+
+      // Persist the ID token so subsequent API calls are authenticated.
+      setIdToken(response.data.idToken);
+
+      // Extract display email from the JWT claims (fall back to typed email).
+      const decoded = decodeJwtPayload(response.data.idToken);
+      const tokenEmail = (decoded?.email as string) || email;
+
+      setEmail(tokenEmail);
       setIsLoggedIn(true);
       onLoginSuccess?.();
-    } else {
-      setLoginError('Email or password is incorrect. Please try again.');
+    } catch (err) {
+      if (err instanceof ApiHttpError) {
+        if (err.status === 401) {
+          setLoginError('Invalid email or password. Please try again.');
+        } else {
+          setLoginError(err.getUserMessage());
+        }
+      } else if (err instanceof ApiNetworkError) {
+        setLoginError('Unable to connect. Please check your connection and try again.');
+      } else {
+        setLoginError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
-    setIsLoggingIn(false);
   }, [email, password, onLoginSuccess]);
 
   const handleLogout = useCallback(() => {
+    setIdToken(null);
     setIsLoggedIn(false);
+    setEmail('');
+    setPassword('');
+    setLoginError('');
   }, []);
 
   return {
