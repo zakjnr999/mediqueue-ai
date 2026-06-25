@@ -6,19 +6,55 @@
  * - Distinguishes HTTP errors (ApiHttpError) from network errors (ApiNetworkError).
  * - Supports request timeouts and external cancellation via AbortSignal.
  * - Parses backend error responses safely.
+ * - Persists the ID token in sessionStorage so it survives page refreshes.
  * - Never logs tokens or sensitive headers.
  */
 
 import { MEDIQUEUE_API_URL, validateEnvironment } from '@/lib/config/env';
 import { ApiHttpError, ApiNetworkError } from '@/lib/api/errors';
 
-// ── Auth token management ──────────────────────────────────────────────────
+// ── Auth token management with sessionStorage persistence ──────────────────
+
+const TOKEN_STORAGE_KEY = 'mediqueue_id_token';
 
 let currentIdToken: string | null = null;
 
-/** Set the Cognito ID token to attach to subsequent API requests. */
+/** Initialise the token from sessionStorage (called once at module load). */
+function initToken(): string | null {
+  if (typeof window === 'undefined') return null; // SSR guard
+  try {
+    const stored = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    if (stored) {
+      currentIdToken = stored;
+      return stored;
+    }
+  } catch {
+    // sessionStorage may be blocked in some environments (e.g. sandboxed iframes).
+  }
+  return null;
+}
+
+// Load persisted token on first import.
+initToken();
+
+/**
+ * Set the Cognito ID token.
+ * Persists to sessionStorage so it survives page refreshes.
+ * Pass null to clear.
+ */
 export function setIdToken(token: string | null): void {
   currentIdToken = token;
+  if (typeof window !== 'undefined') {
+    try {
+      if (token) {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+      } else {
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+    } catch {
+      // Silently ignore storage errors.
+    }
+  }
 }
 
 /** Retrieve the currently stored ID token (for checking auth state). */
@@ -113,6 +149,12 @@ async function request<T>(
     }
 
     if (!res.ok) {
+      // If the server rejects our token, clear it immediately so subsequent
+      // requests don't carry a stale credential.
+      if (res.status === 401 && currentIdToken) {
+        setIdToken(null);
+      }
+
       const errBody = (body?.error as Record<string, unknown>) ?? {};
       const code = typeof errBody?.code === 'string' ? errBody.code : 'UNKNOWN';
       const message =
