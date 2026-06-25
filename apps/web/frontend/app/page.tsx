@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
 import { useCheckin } from '@/hooks/use-checkin';
@@ -10,24 +10,10 @@ import { SymptomSelection } from '@/components/patient/SymptomSelection';
 import { ReviewConfirm } from '@/components/patient/ReviewConfirm';
 import { QueueConfirmation } from '@/components/patient/QueueConfirmation';
 import { StaffDashboard } from '@/components/staff/StaffDashboard';
-import { apiGet } from '@/lib/api/client';
-import { ENDPOINTS } from '@/lib/api/endpoints';
-import type { QueueStatsResponse } from '@/types/api';
 
 export default function Home() {
   const [activePortal, setActivePortal] = useState<'patient' | 'staff'>('patient');
-  const [patientsWaiting, setPatientsWaiting] = useState<number | null>(null);
-
-  // Fetch live queue count for the landing page
-  useEffect(() => {
-    apiGet<QueueStatsResponse>(ENDPOINTS.queue.stats, { timeout: 5000 })
-      .then((res) => {
-        if (res.success) setPatientsWaiting(res.data.inQueue);
-      })
-      .catch(() => {
-        setPatientsWaiting(null);
-      });
-  }, []);
+  const patientsWaiting: number | null = null;
 
   // Patient portal hooks
   const {
@@ -39,6 +25,7 @@ export default function Home() {
     result: checkinResult,
     statusCheckQueueNum,
     statusCheckError,
+    submitError,
     updateForm,
     setStatusCheckQueueNum,
     handleP1Continue,
@@ -48,7 +35,7 @@ export default function Home() {
   } = useCheckin();
 
   return (
-    <div className="min-h-screen bg-surface-grey flex flex-col antialiased font-sans">
+    <div className="min-h-screen bg-surface-grey flex flex-col antialiased font-sans pt-[env(safe-area-inset-top)]">
 
       {/* PORTAL SWITCHER */}
       <div className="bg-slate-900 text-white px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-slate-800 shrink-0 z-50">
@@ -151,6 +138,7 @@ export default function Home() {
                     onUpdate={updateForm}
                     onBack={() => setPatientStep('P1')}
                     onReview={() => setPatientStep('P3')}
+                    submitError={submitError}
                   />
                 )}
                 {patientStep === 'P3' && (
@@ -161,6 +149,7 @@ export default function Home() {
                     onBack={() => setPatientStep('P2')}
                     onEditStep={(step) => setPatientStep(step === 'P1' ? 'P1' : 'P2')}
                     onSubmit={handlePatientSubmit}
+                    submitError={submitError}
                   />
                 )}
                 {patientStep === 'P4' && checkinResult && (

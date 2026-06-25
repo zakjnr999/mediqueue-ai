@@ -37,6 +37,8 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
             onChange={(e) => onUpdate({ name: e.target.value })}
             error={errors.name}
             icon={<User className="w-4 h-4" />}
+            autoComplete="name"
+            maxLength={100}
           />
 
           <Input
@@ -47,6 +49,9 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
             onChange={(e) => onUpdate({ phone: e.target.value })}
             error={errors.phone}
             icon={<Phone className="w-4 h-4" />}
+            autoComplete="tel"
+            inputMode="tel"
+            maxLength={20}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -55,6 +60,8 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
               type="number"
               min="1"
               max="120"
+              step="1"
+              inputMode="numeric"
               placeholder="Age"
               value={form.age}
               onChange={(e) => onUpdate({ age: e.target.value })}
@@ -66,13 +73,16 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
               <select
                 value={form.sex}
                 onChange={(e) => onUpdate({ sex: e.target.value })}
-                className="w-full border border-surface-border rounded-lg px-3.5 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                className={`w-full border rounded-lg px-3.5 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand ${
+                  errors.sex ? 'border-red-500 focus:ring-red-500' : 'border-surface-border'
+                }`}
               >
                 <option value="">Select sex</option>
                 <option value="Female">Female</option>
                 <option value="Male">Male</option>
                 <option value="Prefer not to say">Prefer not to say</option>
               </select>
+              {errors.sex && <p className="text-sm text-red-600 font-medium">{errors.sex}</p>}
             </div>
           </div>
         </div>

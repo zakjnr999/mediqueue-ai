@@ -12,9 +12,10 @@ interface ReviewConfirmProps {
   onBack: () => void;
   onEditStep: (step: 'P1' | 'P2') => void;
   onSubmit: () => void;
+  submitError: string;
 }
 
-export function ReviewConfirm({ form, isSubmitting, onBack, onEditStep, onSubmit }: ReviewConfirmProps) {
+export function ReviewConfirm({ form, isSubmitting, onBack, onEditStep, onSubmit, submitError }: ReviewConfirmProps) {
   return (
     <motion.div
       key="p3"
@@ -110,6 +111,12 @@ export function ReviewConfirm({ form, isSubmitting, onBack, onEditStep, onSubmit
           <Clock className="w-4 h-4 text-brand shrink-0 mt-0.5" />
           <span>A nurse will confirm triage urgency after check-in. If your condition deteriorates, tell clinical staff directly.</span>
         </div>
+
+        {submitError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+            {submitError}
+          </p>
+        )}
       </div>
 
       <div className="flex gap-3 pt-6">

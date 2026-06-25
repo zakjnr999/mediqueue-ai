@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { PatientFormState, CheckinResult } from '@/types/patient';
 import { submitCheckin } from '@/services/checkin-service';
 import { fetchPatientById, fetchPatientByQueueNumber } from '@/services/patient-service';
+import { ApiHttpError, ApiNetworkError } from '@/lib/api/errors';
 
 export type PatientStep = 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 
@@ -17,6 +18,28 @@ const INITIAL_FORM: PatientFormState = {
   selfUrgency: 'Minor',
 };
 
+const GHANA_PHONE_REGEX = /^(?:\+233|233|0)(?:20|23|24|25|26|27|28|29|50|53|54|55|56|57|58|59)\d{7}$/;
+
+function cleanPhoneInput(value: string): string {
+  return value
+    .replace(/[^\d+\s()-]/g, '')
+    .replace(/(?!^)\+/g, '')
+    .slice(0, 20);
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/[\s()-]/g, '');
+}
+
+function hasRepeatedDigitsOnly(value: string): boolean {
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 9 && /^(\d)\1+$/.test(digits);
+}
+
+function cleanAgeInput(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 3);
+}
+
 interface UseCheckinReturn {
   step: PatientStep;
   setStep: (step: PatientStep) => void;
@@ -26,6 +49,7 @@ interface UseCheckinReturn {
   result: CheckinResult | null;
   statusCheckQueueNum: string;
   statusCheckError: string;
+  submitError: string;
   updateForm: (patch: Partial<PatientFormState>) => void;
   setStatusCheckQueueNum: (val: string) => void;
   handleP1Continue: () => void;
@@ -42,9 +66,18 @@ export function useCheckin(): UseCheckinReturn {
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [statusCheckQueueNum, setStatusCheckQueueNum] = useState('');
   const [statusCheckError, setStatusCheckError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const updateForm = useCallback((patch: Partial<PatientFormState>) => {
-    setForm(prev => ({ ...prev, ...patch }));
+    const nextPatch = { ...patch };
+    if (typeof nextPatch.phone === 'string') {
+      nextPatch.phone = cleanPhoneInput(nextPatch.phone);
+    }
+    if (typeof nextPatch.age === 'string') {
+      nextPatch.age = cleanAgeInput(nextPatch.age);
+    }
+    setForm(prev => ({ ...prev, ...nextPatch }));
+    setSubmitError('');
   }, []);
 
   // Validate P1 personal info
@@ -52,22 +85,30 @@ export function useCheckin(): UseCheckinReturn {
     const tempErrors: Record<string, string> = {};
     if (!form.name.trim()) {
       tempErrors.name = 'Please enter your full name';
-    } else if (form.name.length < 2) {
+    } else if (form.name.trim().length < 2) {
       tempErrors.name = 'Name must be at least 2 characters';
+    } else if (form.name.trim().length > 100) {
+      tempErrors.name = 'Name must be under 100 characters';
+    } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(form.name.trim())) {
+      tempErrors.name = 'Name can only contain letters, spaces, hyphens, and apostrophes';
     }
 
-    const phoneClean = form.phone.replace(/\D/g, '');
+    const phoneClean = normalizePhone(form.phone);
     if (!form.phone.trim()) {
       tempErrors.phone = 'Please enter your phone number';
-    } else if (phoneClean.length < 9 || phoneClean.length > 15) {
-      tempErrors.phone = 'Please enter a valid phone number (9-15 digits)';
+    } else if (hasRepeatedDigitsOnly(form.phone) || !GHANA_PHONE_REGEX.test(phoneClean)) {
+      tempErrors.phone = 'Enter a valid Ghana mobile number, e.g. 024 123 4567 or +233 24 123 4567';
     }
 
-    const ageNum = parseInt(form.age, 10);
+    const ageNum = Number(form.age);
     if (!form.age) {
       tempErrors.age = 'Please enter your age';
-    } else if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+    } else if (!Number.isInteger(ageNum) || ageNum < 1 || ageNum > 120) {
       tempErrors.age = 'Please enter an age between 1 and 120';
+    }
+
+    if (!form.sex) {
+      tempErrors.sex = 'Please select sex';
     }
 
     setErrors(tempErrors);
@@ -82,11 +123,18 @@ export function useCheckin(): UseCheckinReturn {
 
   // Submit check-in
   const handlePatientSubmit = useCallback(async () => {
+    setSubmitError('');
+    if (form.symptoms.length === 0 && !form.freeText.trim()) {
+      setSubmitError('Please select at least one symptom or describe what brings you in today.');
+      setStep('P2');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const response = await submitCheckin({
-        name: form.name,
-        phone: form.phone,
+        name: form.name.trim(),
+        phone: normalizePhone(form.phone),
         age: form.age,
         sex: form.sex || 'Prefer not to say',
         symptoms: form.symptoms,
@@ -104,10 +152,16 @@ export function useCheckin(): UseCheckinReturn {
         });
         setStep('P4');
       } else {
-        alert('Check-in failed. Please try again.');
+        setSubmitError('Check-in failed. Please try again.');
       }
-    } catch {
-      alert('Network failure during check-in. Please try again.');
+    } catch (err) {
+      if (err instanceof ApiHttpError) {
+        setSubmitError(err.getUserMessage());
+      } else if (err instanceof ApiNetworkError) {
+        setSubmitError('We could not reach the check-in service. Please check the connection and try again.');
+      } else {
+        setSubmitError('Check-in failed. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -164,6 +218,7 @@ export function useCheckin(): UseCheckinReturn {
     setForm(INITIAL_FORM);
     setResult(null);
     setErrors({});
+    setSubmitError('');
     setStatusCheckQueueNum('');
     setStatusCheckError('');
     setStep('P0');
@@ -178,6 +233,7 @@ export function useCheckin(): UseCheckinReturn {
     result,
     statusCheckQueueNum,
     statusCheckError,
+    submitError,
     updateForm,
     setStatusCheckQueueNum,
     handleP1Continue,

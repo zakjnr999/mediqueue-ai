@@ -11,9 +11,10 @@ interface SymptomSelectionProps {
   onUpdate: (patch: Partial<PatientFormState>) => void;
   onBack: () => void;
   onReview: () => void;
+  submitError: string;
 }
 
-export function SymptomSelection({ form, onUpdate, onBack, onReview }: SymptomSelectionProps) {
+export function SymptomSelection({ form, onUpdate, onBack, onReview, submitError }: SymptomSelectionProps) {
   const toggleSymptom = (id: string) => {
     const updated = form.symptoms.includes(id)
       ? form.symptoms.filter(s => s !== id)
@@ -95,6 +96,12 @@ export function SymptomSelection({ form, onUpdate, onBack, onReview }: SymptomSe
             Your selection assists triage priority mapping, but nursing staff confirms final queue prioritization.
           </p>
         </div>
+
+        {submitError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+            {submitError}
+          </p>
+        )}
       </div>
 
       <div className="flex gap-3 pt-6">
