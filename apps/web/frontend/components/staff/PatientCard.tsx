@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'motion/react';
 import {
   AlertTriangle, ChevronUp, ChevronDown, CheckCircle, Sparkles, Stethoscope, MoreHorizontal,
 } from 'lucide-react';

@@ -15,9 +15,4 @@ export type QueueFilter = 'all' | 'red_flag' | 'WAITING' | 'IN_PROGRESS' | 'COMP
 
 export type SortOption = 'priority' | 'arrival' | 'wait_time';
 
-/** Paginated queue list response from GET /queue. */
-export interface QueueListResponse {
-  patients: import('./patient').Patient[];
-  nextToken: string | null;
-  total: number;
-}
+

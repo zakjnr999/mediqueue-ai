@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Patient, PatientPriority, PatientStatus } from '@/types/patient';
 import type { Stats, QueueFilter, SortOption } from '@/types/queue';
 import { fetchQueue } from '@/services/queue-service';
-import { updatePatientState } from '@/services/patient-service';
+import { updatePatientState, escalatePatientById } from '@/services/patient-service';
 
 interface UseQueueReturn {
   patients: Patient[];
@@ -123,7 +123,6 @@ export function useQueue(): UseQueueReturn {
   }, [refresh]);
 
   const escalatePatient = useCallback(async (patientId: string) => {
-    const { escalatePatientById } = await import('@/services/patient-service');
     const result = await escalatePatientById(patientId);
     if (!result.success) {
       alert('Could not escalate patient.');

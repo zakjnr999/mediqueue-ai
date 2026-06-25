@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
 import { useCheckin } from '@/hooks/use-checkin';
 import { Landing } from '@/components/patient/Landing';
