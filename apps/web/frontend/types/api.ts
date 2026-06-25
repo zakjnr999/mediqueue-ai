@@ -39,39 +39,106 @@ export interface LoginResponse {
   };
 }
 
+/** Raw backend response from POST /check-ins. */
 export interface CreateCheckinResponse {
+  success: true;
+  data: {
+    patientId: string;
+    queueNumber: string;
+    status: string;
+    aiAssessment: {
+      summary: string;
+      redFlags: string[];
+      suggestedPriority: string;
+      reason: string;
+      requiresImmediateStaffReview: boolean;
+    };
+    peopleAhead: number;
+    estimatedWaitTimeMinutes: number;
+    isEscalated: boolean;
+    escalatedBy: string | null;
+    createdAt: string;
+    sex?: string;
+    selfAssessedUrgency?: string;
+  };
+}
+
+/** Raw backend response from GET /patients/{patientId}. */
+export interface PatientDetailsResponse {
+  success: true;
+  data: {
+    patientId: string;
+    queueNumber: string;
+    fullName: string;
+    age: number;
+    symptoms: string[];
+    phoneNumber?: string;
+    additionalDetails?: string;
+    sex?: string;
+    selfAssessedUrgency?: string;
+    aiAssessment: {
+      summary: string;
+      redFlags: string[];
+      suggestedPriority: string;
+      reason: string;
+      requiresImmediateStaffReview: boolean;
+    };
+    staffDecision: {
+      confirmedPriority: string | null;
+      reviewedBy: string | null;
+      reviewedAt: string | null;
+      overrideReason: string | null;
+      reviewerDisplayName: string | null;
+    };
+    status: string;
+    isEscalated: boolean;
+    escalatedBy: string | null;
+    createdAt: string;
+    updatedAt: string;
+    peopleAhead: number;
+    estimatedWaitTimeMinutes: number;
+  };
+}
+
+/** Raw backend response from GET /queue. */
+export interface QueueListResponse {
+  success: true;
+  data: {
+    date: string;
+    patients: QueuePatientItem[];
+    nextToken: string | null;
+  };
+}
+
+/** A patient item as returned by the queue list endpoint. */
+export interface QueuePatientItem {
   patientId: string;
   queueNumber: string;
-  estimatedWaitMinutes: number;
-  queuePosition: number;
+  fullName: string;
+  age: number;
   status: string;
+  isEscalated: boolean;
+  escalatedBy: string | null;
+  aiAssessment: {
+    summary: string;
+    redFlags: string[];
+    suggestedPriority: string;
+    requiresImmediateStaffReview: boolean;
+  };
+  staffDecision: {
+    confirmedPriority: string | null;
+  };
+  createdAt: string;
 }
 
+/** Raw backend response from GET /queue/stats. */
 export interface QueueStatsResponse {
-  patientsInQueue: number;
-  averageWaitMinutes: number;
-  redFlagCount: number;
-  seenTodayCount: number;
-}
-
-export interface PaginatedQueueResponse {
-  patients: import('./patient').Patient[];
-  nextToken: string | null;
-  total: number;
-}
-
-export interface UpdateStatusResponse {
-  id: string;
-  status: string;
-}
-
-export interface UpdatePriorityResponse {
-  id: string;
-  confirmedPriority: string;
-}
-
-export interface EscalateResponse {
-  id: string;
-  status: string;
-  escalatedAt: string;
+  success: true;
+  data: {
+    date: string;
+    inQueue: number;
+    avgWaitTimeMinutes: number;
+    redFlags: number;
+    seenToday: number;
+  };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { PatientFormState, SelfAssessedUrgency, CheckinResult } from '@/types/patient';
+import type { PatientFormState, CheckinResult } from '@/types/patient';
 import { submitCheckin } from '@/services/checkin-service';
 import { fetchPatientById, fetchPatientByQueueNumber } from '@/services/patient-service';
 
@@ -120,14 +120,15 @@ export function useCheckin(): UseCheckinReturn {
     if (!statusCheckQueueNum.trim()) return;
 
     try {
-      const data = await fetchPatientByQueueNumber(statusCheckQueueNum.trim());
-      if (data?.success) {
+      const result = await fetchPatientByQueueNumber(statusCheckQueueNum.trim());
+      if (result?.success && result.data) {
+        const patient = result.data;
         setResult({
-          patientId: data.data.patientId,
-          queueNumber: data.data.queueNumber,
-          estimatedWaitMinutes: data.data.estimatedWaitMinutes ?? 0,
-          status: data.data.status as import('@/types/patient').PatientStatus,
-          queuePosition: data.data.queuePosition ?? 0,
+          patientId: patient.id,
+          queueNumber: patient.queueNumber,
+          estimatedWaitMinutes: 0,
+          status: patient.status,
+          queuePosition: 0,
         });
         setStep('P4');
       } else {
@@ -144,9 +145,12 @@ export function useCheckin(): UseCheckinReturn {
 
     const interval = setInterval(async () => {
       try {
-        const data = await fetchPatientById(result.patientId);
-        if (data?.success) {
-          setResult(prev => prev ? { ...prev, status: data.data.status, position: data.data.position } : prev);
+        const res = await fetchPatientById(result.patientId);
+        if (res?.success && res.data) {
+          const { status } = res.data;
+          setResult(prev =>
+            prev ? { ...prev, status } : prev,
+          );
         }
       } catch {
         // Silently retry on next poll

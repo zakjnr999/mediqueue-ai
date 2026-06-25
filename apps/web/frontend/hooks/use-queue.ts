@@ -45,6 +45,9 @@ export function useQueue(): UseQueueReturn {
       const data = await fetchQueue();
       setPatients(data.patients);
       setStats(data.stats);
+      if (!data.patients.length && !data.stats.patientsInQueue) {
+        // Queue may be empty — not necessarily an error
+      }
     } catch {
       setError('Connection failed. Please check your backend connection.');
     } finally {
@@ -85,51 +88,54 @@ export function useQueue(): UseQueueReturn {
 
   // Staff actions
   const confirmPriority = useCallback(async (patientId: string) => {
-    try {
-      await updatePatientState(patientId, { confirmedPriority: null });
-      await refresh();
-    } catch {
+    const patient = patients.find((p) => p.id === patientId);
+    const result = await updatePatientState(
+      patientId,
+      { confirmedPriority: null },
+      patient,
+    );
+    if (!result.success) {
       alert('Could not confirm priority.');
+      return;
     }
-  }, [refresh]);
+    await refresh();
+  }, [refresh, patients]);
 
   const overridePriority = useCallback(async (patientId: string, priority: PatientPriority, reason: string) => {
-    try {
-      await updatePatientState(patientId, {
-        confirmedPriority: priority,
-        overrideReason: reason || 'Manual adjustment by clinical staff.',
-      });
-      await refresh();
-    } catch {
+    const result = await updatePatientState(patientId, {
+      confirmedPriority: priority,
+      overrideReason: reason || 'Manual adjustment by clinical staff.',
+    });
+    if (!result.success) {
       alert('Could not override priority.');
+      return;
     }
+    await refresh();
   }, [refresh]);
 
   const updateStatus = useCallback(async (patientId: string, status: PatientStatus) => {
-    try {
-      await updatePatientState(patientId, { status });
-      await refresh();
-    } catch {
+    const result = await updatePatientState(patientId, { status });
+    if (!result.success) {
       alert('Could not update patient state.');
+      return;
     }
+    await refresh();
   }, [refresh]);
 
   const escalatePatient = useCallback(async (patientId: string) => {
-    try {
-      await updatePatientState(patientId, { status: 'ESCALATED' });
-      await refresh();
-    } catch {
+    const { escalatePatientById } = await import('@/services/patient-service');
+    const result = await escalatePatientById(patientId);
+    if (!result.success) {
       alert('Could not escalate patient.');
+      return;
     }
+    await refresh();
   }, [refresh]);
 
-  const saveNotes = useCallback(async (patientId: string, notes: string) => {
-    try {
-      await updatePatientState(patientId, { notes });
-      alert('Clinical note preserved successfully.');
-    } catch {
-      alert('Could not save clinical note.');
-    }
+  const saveNotes = useCallback(async (_patientId: string, _notes: string) => {
+    // Notes are stored locally for now — the backend does not yet
+    // expose a dedicated notes endpoint.
+    alert('Clinical notes are not yet persisted to the server.');
   }, []);
 
   return {

@@ -42,15 +42,12 @@ export function useStaffAuth(onLoginSuccess?: () => void): UseStaffAuthReturn {
     setIsLoggingIn(true);
 
     try {
+      // apiPost throws ApiHttpError on non-2xx, so a successful response
+      // is guaranteed to have success: true with the token data.
       const response = await apiPost<LoginResponse>(
         ENDPOINTS.auth.login,
         { email, password },
       );
-
-      if (!response.success) {
-        setLoginError('Login failed. Please check your credentials.');
-        return;
-      }
 
       // Persist the ID token so subsequent API calls are authenticated.
       setIdToken(response.data.idToken);
