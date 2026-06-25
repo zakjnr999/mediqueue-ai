@@ -55,7 +55,7 @@ export function ActivityTimeline({ patients }: ActivityTimelineProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs text-text-secondary">
+      <div className="flex items-center gap-2 text-sm text-text-secondary">
         <Clock className="w-3.5 h-3.5" />
         <span className="font-semibold">Today&apos;s Arrival Timeline</span>
         <span className="text-text-tertiary">(hourly)</span>
@@ -86,14 +86,14 @@ export function ActivityTimeline({ patients }: ActivityTimelineProps) {
               </div>
               {/* Count label */}
               {bucket.count > 0 && (
-                <span className="text-[10px] font-bold text-text-primary tabular-nums -mt-1">
+                <span className="text-xs font-bold text-text-primary tabular-nums -mt-1">
                   {bucket.count}
                 </span>
               )}
               {/* Hour label */}
               <span
                 className={`
-                  text-[9px] font-semibold
+                  text-xs font-semibold
                   ${bucket.active ? 'text-brand' : 'text-text-tertiary'}
                 `}
               >

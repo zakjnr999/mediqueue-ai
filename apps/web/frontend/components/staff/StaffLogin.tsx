@@ -23,48 +23,48 @@ export function StaffLogin({
   onSubmit,
 }: StaffLoginProps) {
   return (
-    <div className="flex-1 flex items-center justify-center py-12">
-      <div className="w-full max-w-[400px] bg-white rounded-xl shadow-md border border-surface-border p-6 space-y-6">
+    <div className="flex-1 flex items-center justify-center py-12 px-2">
+      <div className="w-full max-w-[460px] bg-white rounded-lg shadow-md border border-surface-border p-6 sm:p-8 space-y-7">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2">
             <span className="w-3.5 h-3.5 rounded-full bg-brand" />
-            <span className="font-bold tracking-tight text-xl">MediQueue AI</span>
+            <span className="font-bold tracking-tight text-3xl">MediQueue AI</span>
           </div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Staff Clinical Portal</p>
-          <p className="text-xs text-text-tertiary">Please authenticate with credentials to access the queue manager.</p>
+          <p className="text-sm font-bold uppercase text-text-secondary">Staff clinical portal</p>
+          <p className="text-base text-text-secondary leading-relaxed">Sign in with your clinic credentials to manage today&apos;s queue.</p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Email Address</label>
+        <form onSubmit={onSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-text-secondary">Email address</label>
             <input
               type="email"
               value={email}
               onChange={(e) => onEmailChange(e.target.value)}
-              className="w-full border border-surface-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+              className="w-full border border-surface-border rounded-lg px-3.5 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand"
               required
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-text-secondary">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
-              className="w-full border border-surface-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+              className="w-full border border-surface-border rounded-lg px-3.5 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand"
               required
             />
           </div>
 
           {loginError && (
-            <p className="text-xs text-red-600 font-semibold">{loginError}</p>
+            <p className="text-sm text-red-600 font-semibold">{loginError}</p>
           )}
 
           <button
             type="submit"
             disabled={isLoggingIn}
-            className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-2.5 rounded-lg text-sm transition shadow shadow-brand/10 flex items-center justify-center gap-2"
+            className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3.5 rounded-lg text-lg transition shadow shadow-brand/10 flex items-center justify-center gap-2 disabled:bg-slate-300"
           >
             {isLoggingIn ? (
               <>
@@ -77,9 +77,9 @@ export function StaffLogin({
           </button>
         </form>
 
-        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-text-secondary">
-          <p className="font-semibold text-brand mb-1">Clinical Staff Access:</p>
-          <p>Authenticate with your Cognito user pool credentials provided by your system administrator.</p>
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm text-text-secondary leading-relaxed">
+          <p className="font-semibold text-brand mb-1">Clinical staff access</p>
+          <p>Use the account issued for this Cognito staff user pool.</p>
         </div>
       </div>
     </div>

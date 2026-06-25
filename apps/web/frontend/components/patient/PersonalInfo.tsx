@@ -23,10 +23,10 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
       exit={{ opacity: 0, x: -20 }}
       className="flex-1 flex flex-col justify-between"
     >
-      <div className="space-y-5">
-        <div className="space-y-1">
-          <h2 className="text-lg font-bold text-text-primary">Personal Details</h2>
-          <p className="text-xs text-text-secondary">Please provide accurate details to match with queue records.</p>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-text-primary">Personal details</h2>
+          <p className="text-base text-text-secondary">Please provide accurate details to match with queue records.</p>
         </div>
 
         <div className="space-y-4">
@@ -62,11 +62,11 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
             />
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">Sex</label>
+              <label className="block text-sm font-semibold text-text-secondary">Sex</label>
               <select
                 value={form.sex}
                 onChange={(e) => onUpdate({ sex: e.target.value })}
-                className="w-full border border-surface-border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                className="w-full border border-surface-border rounded-lg px-3.5 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand"
               >
                 <option value="">Select sex</option>
                 <option value="Female">Female</option>
@@ -81,10 +81,10 @@ export function PersonalInfo({ form, errors, onUpdate, onContinue }: PersonalInf
       <div className="pt-6">
         <button
           onClick={onContinue}
-          className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow shadow-brand/20 hover:shadow-md"
+          className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-4 px-5 rounded-lg flex items-center justify-center gap-3 transition-all shadow shadow-brand/20 hover:shadow-md text-lg"
         >
           <span>Continue to symptoms</span>
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-5 h-5" />
         </button>
       </div>
     </motion.div>

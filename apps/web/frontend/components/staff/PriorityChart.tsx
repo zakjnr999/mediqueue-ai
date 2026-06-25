@@ -35,7 +35,7 @@ export function PriorityChart({ patients }: PriorityChartProps) {
 
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-text-tertiary text-xs">
+      <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
         No patient priority data available
       </div>
     );
@@ -119,7 +119,7 @@ export function PriorityChart({ patients }: PriorityChartProps) {
       {/* Legend */}
       <div className="space-y-2.5">
         {slices.map((slice) => (
-          <div key={slice.label} className="flex items-center gap-2.5 text-xs">
+          <div key={slice.label} className="flex items-center gap-2.5 text-sm">
             <span
               className="w-3 h-3 rounded-sm shrink-0"
               style={{ backgroundColor: slice.color }}
@@ -130,7 +130,7 @@ export function PriorityChart({ patients }: PriorityChartProps) {
             <span className="font-bold text-text-primary tabular-nums min-w-[24px] text-right">
               {slice.value}
             </span>
-            <span className="text-text-tertiary text-[10px] w-[40px] text-right">
+            <span className="text-text-tertiary text-xs w-[40px] text-right">
               {slice.percentage}%
             </span>
             {/* Mini bar */}

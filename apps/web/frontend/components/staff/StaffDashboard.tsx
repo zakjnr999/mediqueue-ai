@@ -125,12 +125,12 @@ export function StaffDashboard() {
 
         {/* Connection error banner */}
         {queueError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-800 flex items-center gap-2 shadow-sm">
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 flex items-center gap-2 shadow-sm">
             <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
             <span className="flex-1">{queueError}</span>
             <button
               onClick={refreshQueue}
-              className="text-xs font-bold text-red-700 hover:underline shrink-0"
+              className="text-sm font-bold text-red-700 hover:underline shrink-0"
             >
               Retry
             </button>

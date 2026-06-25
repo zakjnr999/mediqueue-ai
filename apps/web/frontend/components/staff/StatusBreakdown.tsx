@@ -33,7 +33,7 @@ export function StatusBreakdown({ patients }: StatusBreakdownProps) {
   const total = patients.length;
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-24 text-text-tertiary text-xs">
+      <div className="flex items-center justify-center h-24 text-text-tertiary text-sm">
         No patient status data
       </div>
     );
@@ -54,7 +54,7 @@ export function StatusBreakdown({ patients }: StatusBreakdownProps) {
 
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center gap-2 text-xs text-text-secondary">
+      <div className="flex items-center gap-2 text-sm text-text-secondary">
         <Activity className="w-3.5 h-3.5" />
         <span className="font-semibold">Status Breakdown</span>
         <span className="text-text-tertiary">{total} patients</span>
@@ -78,7 +78,7 @@ export function StatusBreakdown({ patients }: StatusBreakdownProps) {
       {/* Legend row */}
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {segments.map((seg) => (
-          <div key={seg.status} className="flex items-center gap-1.5 text-[11px]">
+          <div key={seg.status} className="flex items-center gap-1.5 text-sm">
             <span
               className="w-2 h-2 rounded-sm shrink-0"
               style={{ backgroundColor: seg.color }}

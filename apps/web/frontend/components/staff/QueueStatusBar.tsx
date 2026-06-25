@@ -78,7 +78,7 @@ export function QueueStatusBar({ patients, activeFilter, onFilterChange }: Queue
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-surface-border p-3 shadow-sm">
+    <div className="bg-white rounded-lg border border-surface-border p-3 shadow-sm">
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
         {statusItems.map((item) => {
           const isActive = activeFilter === item.key;
@@ -90,7 +90,7 @@ export function QueueStatusBar({ patients, activeFilter, onFilterChange }: Queue
               onClick={() => onFilterChange(item.key)}
               whileTap={{ scale: 0.95 }}
               className={`
-                relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold
+                relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold
                 transition-all duration-200 shrink-0 border
                 ${isActive
                   ? `${item.activeColor} border-transparent shadow-sm`
@@ -108,7 +108,7 @@ export function QueueStatusBar({ patients, activeFilter, onFilterChange }: Queue
                   animate={{ scale: 1 }}
                   className={`
                     inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
-                    rounded-full text-[10px] font-bold
+                    rounded-full text-xs font-bold
                     ${isActive
                       ? 'bg-white/20 text-white'
                       : 'bg-white/80 text-current'
@@ -119,7 +119,7 @@ export function QueueStatusBar({ patients, activeFilter, onFilterChange }: Queue
                 </motion.span>
               )}
               {!hasCount && (
-                <span className="text-current opacity-40 text-[10px] font-normal">—</span>
+                <span className="text-current opacity-40 text-xs font-normal">—</span>
               )}
             </motion.button>
           );

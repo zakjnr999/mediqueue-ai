@@ -18,7 +18,7 @@ export function Badge({ children, className = '', variant = 'default' }: BadgePr
   };
 
   return (
-    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${variants[variant]} ${className}`}>
+    <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${variants[variant]} ${className}`}>
       {children}
     </span>
   );

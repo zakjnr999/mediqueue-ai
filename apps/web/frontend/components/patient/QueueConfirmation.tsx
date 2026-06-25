@@ -17,31 +17,31 @@ export function QueueConfirmation({ result, phone, onReset }: QueueConfirmationP
       key="p4"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="space-y-6 text-center"
+      className="space-y-7 text-center"
     >
-      <div className="space-y-1 pt-2">
-        <h2 className="text-xl font-bold text-brand">You are checked in</h2>
-        <p className="text-xs text-text-secondary">Please wait in the seating area. We will call you shortly.</p>
+      <div className="space-y-2 pt-2">
+        <h2 className="text-3xl font-bold text-brand">You are checked in</h2>
+        <p className="text-base text-text-secondary">Please wait in the seating area. We will call you shortly.</p>
       </div>
 
-      <div className="bg-brand-light/50 border border-brand/20 rounded-2xl p-6 space-y-4 max-w-[320px] mx-auto shadow-sm">
+      <div className="bg-brand-light/50 border border-brand/20 rounded-lg p-6 space-y-4 max-w-[360px] mx-auto shadow-sm">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-brand uppercase tracking-wider">Your Queue Number</p>
-          <p className="text-5xl font-mono font-extrabold text-brand tracking-tight">
+          <p className="text-sm font-bold text-brand uppercase">Your queue number</p>
+          <p className="text-6xl font-mono font-extrabold text-brand tracking-tight">
             {result.queueNumber}
           </p>
         </div>
 
         <div className="border-t border-brand/10 pt-3 flex justify-between items-center">
-          <span className="text-xs text-text-secondary font-medium">Estimated wait</span>
-          <span className="text-base font-bold text-text-primary">
+          <span className="text-sm text-text-secondary font-medium">Estimated wait</span>
+          <span className="text-lg font-bold text-text-primary">
             {result.estimatedWaitMinutes > 0 ? `~ ${result.estimatedWaitMinutes} minutes` : 'Immediate'}
           </span>
         </div>
 
         <div className="flex justify-between items-center">
-          <span className="text-xs text-text-secondary font-medium">Triage Status</span>
-          <span className={`px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+          <span className="text-sm text-text-secondary font-medium">Triage status</span>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1.5 ${
             result.status === 'COMPLETED'
               ? 'bg-urgency-done-bg text-urgency-done-text'
               : result.status === 'IN_PROGRESS'
@@ -58,14 +58,14 @@ export function QueueConfirmation({ result, phone, onReset }: QueueConfirmationP
         </div>
 
         {result.queuePosition !== undefined && result.status === 'WAITING' && (
-          <div className="border-t border-brand/10 pt-3 flex justify-between items-center text-xs">
+          <div className="border-t border-brand/10 pt-3 flex justify-between items-center text-sm">
             <span className="text-text-secondary">Queue Position</span>
             <span className="font-bold text-brand-dark">#{result.queuePosition} ahead</span>
           </div>
         )}
       </div>
 
-      <div className="bg-slate-50 border border-surface-border rounded-xl p-4 text-left text-xs text-text-secondary space-y-3 max-w-[360px] mx-auto">
+      <div className="bg-slate-50 border border-surface-border rounded-lg p-4 text-left text-sm text-text-secondary space-y-3 max-w-[420px] mx-auto leading-relaxed">
         <div className="flex gap-3">
           <Phone className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
           <p>We will send an SMS to <span className="font-semibold text-text-primary">{phone || 'your phone'}</span> when a consultant is ready.</p>
@@ -83,9 +83,9 @@ export function QueueConfirmation({ result, phone, onReset }: QueueConfirmationP
       <div className="pt-4">
         <button
           onClick={onReset}
-          className="text-brand hover:text-brand-dark font-semibold text-xs border border-brand/20 bg-brand-light px-5 py-2 rounded-lg transition hover:bg-brand-light/80"
+          className="text-brand hover:text-brand-dark font-semibold text-base border border-brand/20 bg-brand-light px-5 py-3 rounded-lg transition hover:bg-brand-light/80"
         >
-          Register New Patient
+          Register new patient
         </button>
       </div>
     </motion.div>

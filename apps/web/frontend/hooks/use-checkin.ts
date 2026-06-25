@@ -132,10 +132,10 @@ export function useCheckin(): UseCheckinReturn {
         });
         setStep('P4');
       } else {
-        setStatusCheckError('No active patient found with this queue number.');
+        setStatusCheckError('Status lookup is currently available at the staff desk.');
       }
     } catch {
-      setStatusCheckError('Failed to query status. Please verify connection.');
+      setStatusCheckError('Status lookup is currently available at the staff desk.');
     }
   }, [statusCheckQueueNum]);
 

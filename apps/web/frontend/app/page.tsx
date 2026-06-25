@@ -16,7 +16,7 @@ import type { QueueStatsResponse } from '@/types/api';
 
 export default function Home() {
   const [activePortal, setActivePortal] = useState<'patient' | 'staff'>('patient');
-  const [patientsWaiting, setPatientsWaiting] = useState(0);
+  const [patientsWaiting, setPatientsWaiting] = useState<number | null>(null);
 
   // Fetch live queue count for the landing page
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function Home() {
         if (res.success) setPatientsWaiting(res.data.inQueue);
       })
       .catch(() => {
-        // Silent fail — landing shows 0 when backend is unreachable
+        setPatientsWaiting(null);
       });
   }, []);
 
@@ -50,44 +50,44 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-surface-grey flex flex-col antialiased font-sans">
 
-      {/* PORTAL TOGGLE */}
-      <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-b border-slate-800 shrink-0 z-50">
+      {/* PORTAL SWITCHER */}
+      <div className="bg-slate-900 text-white px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-slate-800 shrink-0 z-50">
         <div className="flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
-          <span className="text-xs font-semibold tracking-wider text-slate-300 uppercase">Interactive Preview Sandbox</span>
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-400" />
+          <span className="text-sm font-semibold text-slate-200">MediQueue AI</span>
         </div>
-        <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+        <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
           <button
             onClick={() => setActivePortal('patient')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activePortal === 'patient' ? 'bg-brand text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${activePortal === 'patient' ? 'bg-brand text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}
           >
-            Patient Check-In Flow
+            Patient intake
           </button>
           <button
             onClick={() => setActivePortal('staff')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activePortal === 'staff' ? 'bg-brand text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${activePortal === 'staff' ? 'bg-brand text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}
           >
-            Staff Dashboard Portal
+            Staff queue
           </button>
         </div>
       </div>
 
       {/* PATIENT PORTAL */}
       {activePortal === 'patient' && (
-        <main className="flex-1 flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-[480px] bg-white rounded-xl shadow-lg border border-surface-border overflow-hidden flex flex-col min-h-[580px]">
+        <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+          <div className="w-full max-w-[560px] bg-white rounded-lg shadow-lg border border-surface-border overflow-hidden flex flex-col min-h-[620px]">
 
-            <header className="px-5 py-4 border-b border-surface-border flex items-center justify-between bg-white">
+            <header className="px-5 sm:px-6 py-4 border-b border-surface-border flex items-center justify-between bg-white">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-brand" />
-                <span className="font-semibold tracking-tight text-text-primary text-lg">MediQueue AI</span>
+                <span className="font-bold tracking-tight text-text-primary text-xl">MediQueue AI</span>
               </div>
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">Patient Intake</span>
+              <span className="text-sm font-semibold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-md">Patient intake</span>
             </header>
 
             {patientStep !== 'P0' && (
-              <div className="px-5 py-3.5 bg-slate-50 border-b border-surface-border flex items-center justify-between">
-                <div className="flex items-center w-full justify-between max-w-[280px] mx-auto text-xs font-medium">
+              <div className="px-5 py-4 bg-slate-50 border-b border-surface-border flex items-center justify-between">
+                <div className="flex items-center w-full justify-between max-w-[340px] mx-auto text-sm font-medium">
                   {['P1', 'P2', 'P3', 'P4'].map((s, idx) => {
                     const stepNum = idx + 1;
                     const isCompleted = ['P2', 'P3', 'P4'].includes(s) && patientStep !== s
@@ -103,14 +103,14 @@ export default function Home() {
                               : 'bg-slate-200'
                           }`} />
                         )}
-                        <div className="flex flex-col items-center gap-1">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                             isActive ? 'bg-brand text-white' :
                             isCompleted ? 'bg-brand-light text-brand' : 'bg-slate-200 text-slate-400'
                           }`}>
-                            {isCompleted ? <CheckCircle className="w-4 h-4" /> : stepNum}
+                            {isCompleted ? <CheckCircle className="w-5 h-5" /> : stepNum}
                           </span>
-                          <span className="text-[10px] text-text-secondary">
+                          <span className="text-xs text-text-secondary">
                             {idx === 0 ? 'Info' : idx === 1 ? 'Symptoms' : 'Review'}
                           </span>
                         </div>
@@ -121,7 +121,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex-1 p-5 sm:p-6 flex flex-col justify-between">
+            <div className="flex-1 p-5 sm:p-7 flex flex-col justify-between">
               <AnimatePresence mode="wait">
                 {patientStep === 'P0' && (
                   <Landing
@@ -174,7 +174,7 @@ export default function Home() {
               </AnimatePresence>
             </div>
 
-            <footer className="px-5 py-3.5 bg-slate-50 border-t border-surface-border text-center text-[10px] text-text-tertiary">
+            <footer className="px-5 py-4 bg-slate-50 border-t border-surface-border text-center text-sm text-text-tertiary">
               MediQueue AI Triage &bull; Powered by AWS Amazon Bedrock
             </footer>
           </div>
@@ -190,4 +190,3 @@ export default function Home() {
     </div>
   );
 }
-

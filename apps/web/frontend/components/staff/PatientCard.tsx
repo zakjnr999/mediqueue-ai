@@ -50,17 +50,17 @@ export function PatientCard({
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all duration-300 ${
+      className={`bg-white rounded-lg shadow-sm border overflow-hidden transition-all duration-300 ${
         patient.status === 'ESCALATED' ? 'border-red-500 bg-red-50/10' : isExpanded ? 'border-brand' : 'border-surface-border'
       }`}
     >
       {patient.status === 'ESCALATED' && (
-        <div className="bg-red-600 text-white text-[10px] font-bold tracking-widest uppercase py-1 px-4 flex items-center justify-between">
+        <div className="bg-red-600 text-white text-xs font-bold uppercase py-2 px-4 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Escalated — Immediate attention required</span>
           </span>
-          <span className="bg-red-800 text-white px-2 py-0.5 rounded text-[9px]">CRITICAL</span>
+          <span className="bg-red-800 text-white px-2 py-0.5 rounded text-xs">Critical</span>
         </div>
       )}
 
@@ -79,16 +79,16 @@ export function PatientCard({
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm text-text-primary truncate">{patient.name}</h3>
+              <h3 className="font-bold text-base text-text-primary truncate">{patient.name}</h3>
               {patient.isRedFlag && (
-                <span className="bg-red-100 text-red-700 px-1.5 py-0.5 text-[9px] font-bold rounded flex items-center gap-0.5 animate-pulse shrink-0">
+                <span className="bg-red-100 text-red-700 px-2 py-0.5 text-xs font-bold rounded flex items-center gap-1 animate-pulse shrink-0">
                   <Sparkles className="w-2.5 h-2.5" />
-                  <span>RED FLAG</span>
+                  <span>Red flag</span>
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-text-secondary mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              <span className="font-mono font-bold text-brand-dark text-[12px]">{patient.queueNumber}</span>
+            <p className="text-sm text-text-secondary mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span className="font-mono font-bold text-brand-dark">{patient.queueNumber}</span>
               <span>•</span>
               <span>{patient.sex}, {patient.age}y</span>
               <span>•</span>
@@ -98,7 +98,7 @@ export function PatientCard({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
             patient.status === 'COMPLETED' ? 'bg-urgency-done-bg text-urgency-done-text border border-slate-200' :
             patient.status === 'IN_PROGRESS' ? 'bg-urgency-progress-bg text-urgency-progress-text border border-blue-200' :
             patient.status === 'ESCALATED' ? 'bg-red-100 text-red-800 border border-red-300' :
@@ -115,21 +115,21 @@ export function PatientCard({
       {isExpanded && (
         <div className="border-t border-surface-border p-4 bg-slate-50/60 space-y-4">
           {/* AI Clinical Triage Summary */}
-          <div className="bg-white rounded-xl border border-surface-border p-4 shadow-inner relative">
+          <div className="bg-white rounded-lg border border-surface-border p-4 shadow-inner relative">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-brand" />
-                <span className="text-xs font-bold text-brand uppercase tracking-wider">AI Clinical Triage Summary</span>
+                <span className="text-sm font-bold text-brand uppercase">Clinical triage summary</span>
               </div>
-              <span className="text-[10px] font-mono bg-brand-light text-brand px-1.5 py-0.5 rounded font-bold">AMAZON BEDROCK</span>
+              <span className="text-xs bg-brand-light text-brand px-2 py-1 rounded font-bold">Bedrock</span>
             </div>
 
-            <p className="text-xs text-text-primary leading-relaxed">{patient.aiSummary}</p>
+            <p className="text-sm text-text-primary leading-relaxed">{patient.aiSummary}</p>
 
-            <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-slate-100 text-[11px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-3 border-t border-slate-100 text-sm">
               <div>
                 <span className="text-text-tertiary">AI-Suggested Priority:</span>
-                <span className={`ml-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                <span className={`ml-2 inline-block px-2 py-0.5 rounded text-xs font-bold uppercase ${
                   patient.aiSuggestedPriority === 'HIGH' ? 'bg-red-50 text-red-700' :
                   patient.aiSuggestedPriority === 'MEDIUM' ? 'bg-amber-50 text-amber-700' :
                   'bg-teal-50 text-teal-700'
@@ -141,7 +141,7 @@ export function PatientCard({
                 <span className="text-text-tertiary">Confirmed Priority:</span>
                 <span className="ml-2 font-bold text-text-primary">
                   {patient.confirmedPriority ? (
-                    <span className="text-brand uppercase text-[10px] bg-brand-light px-2 py-0.5 rounded">
+                    <span className="text-brand uppercase text-xs bg-brand-light px-2 py-0.5 rounded">
                       {patient.confirmedPriority} (Manual)
                     </span>
                   ) : (
@@ -153,8 +153,8 @@ export function PatientCard({
           </div>
 
           {/* Patient Details */}
-          <div className="bg-white rounded-xl border border-surface-border p-4 text-xs space-y-3 shadow-inner">
-            <h4 className="font-bold text-[11px] text-text-secondary uppercase tracking-widest border-b border-slate-100 pb-1.5">Full Intake Specifications</h4>
+          <div className="bg-white rounded-lg border border-surface-border p-4 text-sm space-y-3 shadow-inner">
+            <h4 className="font-bold text-sm text-text-secondary uppercase border-b border-slate-100 pb-1.5">Patient intake details</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div><p className="text-text-tertiary">Patient Contact</p><p className="font-semibold text-text-primary">{patient.phone}</p></div>
               <div><p className="text-text-tertiary">Demographics</p><p className="font-semibold text-text-primary">{patient.sex || 'Unknown'}, {patient.age} years old</p></div>
@@ -168,7 +168,7 @@ export function PatientCard({
                 {patient.symptoms.map(s => {
                   const match = SYMPTOM_LIST.find(sym => sym.id === s);
                   return (
-                    <span key={s} className="bg-slate-100 text-text-secondary font-medium px-2 py-0.5 rounded text-[11px]">
+                    <span key={s} className="bg-slate-100 text-text-secondary font-medium px-2.5 py-1 rounded text-sm">
                       {match ? match.label : s}
                     </span>
                   );
@@ -179,31 +179,31 @@ export function PatientCard({
             {patient.freeText && (
               <div className="space-y-1.5 pt-1.5 border-t border-slate-100">
                 <p className="text-text-tertiary font-medium">Patient Description Notes</p>
-                <p className="bg-slate-50 p-2.5 rounded text-text-secondary leading-relaxed italic text-[11px]">
+                <p className="bg-slate-50 p-2.5 rounded text-text-secondary leading-relaxed italic text-sm">
                   &ldquo;{patient.freeText}&rdquo;
                 </p>
               </div>
             )}
 
             {patient.overrideReason && (
-              <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-2.5 mt-2 text-[11px]">
-                <p className="font-bold text-amber-800">Priority Override Log:</p>
+              <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-2.5 mt-2 text-sm">
+                <p className="font-bold text-amber-800">Priority override log:</p>
                 <p className="text-amber-900 mt-0.5">{patient.overrideReason}</p>
               </div>
             )}
 
             {patient.status === 'IN_PROGRESS' && (
               <div className="space-y-2 border-t border-slate-100 pt-3">
-                <label className="block text-xs font-bold text-text-secondary uppercase">Clinical Notes & Observations</label>
+                <label className="block text-sm font-bold text-text-secondary">Clinical notes and observations</label>
                 <textarea
                   value={staffNotesInput}
                   onChange={(e) => onStaffNotesChange(e.target.value)}
                   placeholder="Enter physical observations, initial blood pressures, treatment notes..."
-                  className="w-full border border-surface-border rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand h-16"
+                  className="w-full border border-surface-border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand h-20"
                 />
                 <button
                   onClick={() => onSaveNotes(staffNotesInput)}
-                  className="bg-brand hover:bg-brand-dark text-white px-3 py-1.5 rounded-lg text-[10px] font-bold"
+                  className="bg-brand hover:bg-brand-dark text-white px-3 py-2 rounded-lg text-sm font-bold"
                 >
                   Save Clinical Note
                 </button>
@@ -211,8 +211,8 @@ export function PatientCard({
             )}
 
             {patient.notes && (
-              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2.5 mt-2 text-[11px]">
-                <p className="font-bold text-blue-800">Preserved Consultation Notes:</p>
+              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2.5 mt-2 text-sm">
+                <p className="font-bold text-blue-800">Consultation notes:</p>
                 <p className="text-blue-900 mt-0.5">{patient.notes}</p>
               </div>
             )}
@@ -224,25 +224,25 @@ export function PatientCard({
               <>
                 <button
                   onClick={onConfirmPriority}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition"
                 >
                   Confirm Priority
                 </button>
                 <button
                   onClick={onOpenOverride}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-text-secondary border border-surface-border hover:bg-slate-50 transition"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-white text-text-secondary border border-surface-border hover:bg-slate-50 transition"
                 >
                   Override Priority
                 </button>
                 <button
                   onClick={() => onUpdateStatus('IN_PROGRESS')}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition"
                 >
                   Mark Attending
                 </button>
                 <button
                   onClick={onEscalate}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-800 hover:bg-red-200 border border-red-300 transition flex items-center gap-1.5"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-red-100 text-red-800 hover:bg-red-200 border border-red-300 transition flex items-center gap-1.5"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
                   <span>Escalate Critical</span>
@@ -254,13 +254,13 @@ export function PatientCard({
               <>
                 <button
                   onClick={() => onUpdateStatus('IN_PROGRESS')}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition"
                 >
                   Mark Attending
                 </button>
                 <button
                   onClick={() => onUpdateStatus('COMPLETED')}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
                 >
                   Mark Completed
                 </button>
@@ -270,14 +270,14 @@ export function PatientCard({
             {patient.status === 'IN_PROGRESS' && (
               <button
                 onClick={() => onUpdateStatus('COMPLETED')}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
+                className="px-3.5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
               >
                 Mark Completed
               </button>
             )}
 
             {patient.status === 'COMPLETED' && (
-              <span className="text-xs text-text-tertiary italic flex items-center gap-1">
+              <span className="text-sm text-text-tertiary italic flex items-center gap-1">
                 <CheckCircle className="w-3.5 h-3.5 text-brand" />
                 <span>Consultation closed at {patient.completedAt ? new Date(patient.completedAt).toLocaleTimeString() : 'N/A'}</span>
               </span>
