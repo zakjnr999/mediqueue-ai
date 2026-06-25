@@ -9,6 +9,9 @@ export interface QueueData {
   stats: Stats;
 }
 
+const QUEUE_FETCH_LIMIT = 50;
+const QUEUE_MAX_PAGES = 3;
+
 /**
  * Map a raw queue list item from the backend to the frontend Patient type.
  */
@@ -46,15 +49,34 @@ function mapQueueItem(item: import('@/types/api').QueuePatientItem): Patient {
  * Makes two parallel requests: GET /queue and GET /queue/stats.
  */
 export async function fetchQueue(): Promise<QueueData> {
-  const [listResponse, statsResponse] = await Promise.all([
-    apiGet<QueueListResponse>(ENDPOINTS.queue.list, { timeout: 10_000 }),
+  const [firstListResponse, statsResponse] = await Promise.all([
+    apiGet<QueueListResponse>(`${ENDPOINTS.queue.list}?limit=${QUEUE_FETCH_LIMIT}`, { timeout: 10_000 }),
     apiGet<QueueStatsResponse>(ENDPOINTS.queue.stats, { timeout: 10_000 }),
   ]);
 
-  const patients: Patient[] =
-    listResponse.success
-      ? listResponse.data.patients.map(mapQueueItem)
-      : [];
+  const queueItems: import('@/types/api').QueuePatientItem[] =
+    firstListResponse.success ? [...firstListResponse.data.patients] : [];
+
+  let nextToken = firstListResponse.success ? firstListResponse.data.nextToken : null;
+  let pagesFetched = 1;
+
+  while (nextToken && pagesFetched < QUEUE_MAX_PAGES) {
+    const params = new URLSearchParams({
+      limit: String(QUEUE_FETCH_LIMIT),
+      nextToken,
+    });
+    const response = await apiGet<QueueListResponse>(
+      `${ENDPOINTS.queue.list}?${params.toString()}`,
+      { timeout: 10_000 },
+    );
+
+    if (!response.success) break;
+    queueItems.push(...response.data.patients);
+    nextToken = response.data.nextToken;
+    pagesFetched += 1;
+  }
+
+  const patients: Patient[] = queueItems.map(mapQueueItem);
 
   const stats: Stats = statsResponse.success
     ? {
