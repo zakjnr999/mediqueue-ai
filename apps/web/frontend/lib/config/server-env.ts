@@ -12,6 +12,8 @@
 
 import 'server-only';
 
+const DEFAULT_MEDIQUEUE_API_URL = 'https://p7xz21rbv0.execute-api.us-west-2.amazonaws.com/dev';
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -30,5 +32,5 @@ function requireEnv(name: string): string {
  * Read this at request time so Next.js builds do not require runtime env.
  */
 export function getMediqueueApiUrl(): string {
-  return requireEnv('MEDIQUEUE_API_URL');
+  return process.env.MEDIQUEUE_API_URL || DEFAULT_MEDIQUEUE_API_URL;
 }

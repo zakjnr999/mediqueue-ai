@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getMediqueueApiUrl } from '@/lib/config/server-env';
 
 const LOGIN_TIMEOUT_MS = 10_000;
 
@@ -16,12 +17,7 @@ function jsonError(status: number, code: string, message: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const apiBaseUrl = process.env.MEDIQUEUE_API_URL;
-
-  if (!apiBaseUrl) {
-    console.error('Staff login configuration missing');
-    return jsonError(500, 'CONFIGURATION_ERROR', 'Sign-in is temporarily unavailable.');
-  }
+  const apiBaseUrl = getMediqueueApiUrl();
 
   let payload: unknown;
   try {
