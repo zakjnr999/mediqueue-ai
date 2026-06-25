@@ -60,9 +60,8 @@ services/triage/
 │   └── validation/
 │       ├── validate-patient-input.mjs    # Symptom details validation
 │       ├── validate-triage-response.mjs  # Bedrock response schema checks
-│       ├── validate-checkin-request.mjs  # Check-in request schema checks (incl. sex & selfAssessedUrgency)
-│       ├── validate-queue-query.mjs      # Queue parameter validations (incl. status & hasRedFlags)
-│       ├── validate-priority-update.mjs  # Priority update validation (incl. reviewerDisplayName)
+│       ├── validate-checkin-request.mjs  # Check-in request schema checks
+│       ├── validate-queue-query.mjs      # Queue parameter validations
 │       └── validate-patient-id.mjs       # UUID v4 structural validation
 ├── tests/
 │   ├── triage-validation.test.mjs        # Offline Bedrock/validation tests
@@ -104,20 +103,14 @@ To support sorting by check-in time (`createdAt`), configure `PATIENTS_QUEUE_IND
 ### 1. POST `/check-ins` (Patient Check-in)
 Submits a symptom report and generates a wait ticket.
 - **Request Body**: Name, age, phone number, symptoms list, details.
-- **Optional Fields**: `sex` (Male/Female/Prefer not to say), `selfAssessedUrgency` (Minor/Moderate/Urgent).
-- **Privacy Rules**: `sex` and `selfAssessedUrgency` are stored in DynamoDB but **never** sent to Bedrock or exposed in the queue list. Bedrock receives only `{ age, symptoms, additionalDetails }`.
-- **Response**: Assigned queue number, status, AI assessment, uuid, and optionally `sex`/`selfAssessedUrgency` if provided.
+- **Response**: Assigned queue number, status, AI assessment, and uuid.
 
 ### 2. GET `/queue` (Staff Queue List)
 Retrieves the check-in queue list for a specific date.
 - **Query Parameters**:
   - `date` (Optional): `YYYY-MM-DD` (UTC). Defaults to current date.
   - `limit` (Optional): Number between 1 and 50 (defaults to 20).
-  - `nextToken` (Optional): Opaque token bound to active filters.
-  - `status` (Optional): Filter by `WAITING`, `IN_PROGRESS`, or `COMPLETED` (applied in-memory after query).
-  - `hasRedFlags` (Optional): `"true"` or `"false"` to filter by presence of red flags (applied in-memory after query).
-- **Pagination v2**: Tokens include filter context (`status`, `hasRedFlags`). Mismatched filter values between token and request are rejected.
-- **Filter Semantics**: Filtering is applied in-memory after DynamoDB query. Combined with pagination, the nextToken captures active filter values to prevent drift.
+  - `nextToken` (Optional): Opaque token.
 - **Response Payload**:
 ```json
 {
@@ -150,7 +143,6 @@ Retrieves the check-in queue list for a specific date.
 
 ### 3. GET `/patients/{patientId}` (Staff Patient Details)
 Retrieves the full check-in record details.
-- **Sensitive fields**: `sex` and `selfAssessedUrgency` are included here (patient details only), omitted from queue list.
 - **Response Payload**:
 ```json
 {
@@ -174,8 +166,7 @@ Retrieves the full check-in record details.
       "confirmedPriority": null,
       "reviewedBy": null,
       "reviewedAt": null,
-      "overrideReason": null,
-      "reviewerDisplayName": null
+      "overrideReason": null
     },
     "status": "WAITING",
     "createdAt": "2026-06-23T14:30:00.000Z",
@@ -196,9 +187,8 @@ Updates the triage priority confirmed by staff.
 - **Rules**:
   - `confirmedPriority` must be string and one of `HIGH`, `MEDIUM`, `LOW`.
   - `overrideReason` is required if `confirmedPriority` differs from `aiAssessment.suggestedPriority` (trimmed string, max 500 chars). Normalizes to `null` if empty/omitted and priority matches.
-  - `reviewerDisplayName` (Optional, max 100 chars): Display name of the reviewing staff member. Stored unverified as a display label.
-  - `reviewedBy` is **rejected** from client input (reserved for future auth). `staffDecision.reviewedBy` remains `null`.
   - Concurrency Check: Update is conditional on `updatedAt` matching the timestamp retrieved during consistent read.
+  - `staffDecision.reviewedBy` is set to `null` for this milestone.
 - **Response Payload**:
 ```json
 {
@@ -264,6 +254,5 @@ npm test
 ## Known Limitations
 
 * **Request Idempotency**: Repeated check-in submissions by a client screen will allocate duplicate queue numbers and store duplicate records.
-* **Pagination Token Security**: Pagination tokens are validated, date-bound, and filter-bound but are not cryptographically signed in this hackathon milestone.
-* **Staff Authentication**: No authentication or authorization is configured for staff endpoints in this milestone. `reviewedBy` remains `null`; `reviewerDisplayName` is an unverified display label only. Do not expose these endpoints publicly in production without configuring security scopes.
-* **In-Memory Filtering**: `status` and `hasRedFlags` filters are applied in-memory after DynamoDB query. Large datasets with restrictive filters may return fewer results than the requested `limit`.
+* **Pagination Token Security**: Pagination tokens are validated and date-bound but are not cryptographically signed in this hackathon milestone.
+* **Staff Authentication**: No authentication or authorization is configured for staff endpoints in this milestone. reviewedBy remains null. Do not expose these endpoints publicly in production without configuring security scopes.

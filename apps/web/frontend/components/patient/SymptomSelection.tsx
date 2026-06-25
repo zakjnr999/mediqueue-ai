@@ -73,15 +73,15 @@ export function SymptomSelection({ form, onUpdate, onBack, onReview }: SymptomSe
         <div className="space-y-2">
           <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">How urgent does this feel?</label>
           <div className="grid grid-cols-3 gap-2">
-            {(['minor', 'moderate', 'urgent'] as const).map((level) => (
+            {(['Minor', 'Moderate', 'Urgent'] as const).map((level) => (
               <button
                 key={level}
                 onClick={() => onUpdate({ selfUrgency: level })}
                 className={`py-2 px-3 rounded-lg border text-xs font-semibold transition capitalize ${
                   form.selfUrgency === level
-                    ? level === 'minor'
+                    ? level === 'Minor'
                       ? 'bg-urgency-minor-bg border-urgency-minor-border text-urgency-minor-text'
-                      : level === 'moderate'
+                      : level === 'Moderate'
                       ? 'bg-urgency-moderate-bg border-urgency-moderate-border text-urgency-moderate-text'
                       : 'bg-urgency-urgent-bg border-urgency-urgent-border text-urgency-urgent-text'
                     : 'bg-white border-surface-border text-text-secondary hover:bg-slate-50'

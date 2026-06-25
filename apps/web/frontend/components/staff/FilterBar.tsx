@@ -14,9 +14,9 @@ interface FilterBarProps {
 const FILTERS: { key: QueueFilter; label: string; icon?: boolean }[] = [
   { key: 'all', label: 'All patients' },
   { key: 'red_flag', label: 'Red Flags', icon: true },
-  { key: 'waiting', label: 'Waiting' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'WAITING', label: 'Waiting' },
+  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'COMPLETED', label: 'Completed' },
 ];
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -34,9 +34,9 @@ export function FilterBar({ activeFilter, sortBy, onFilterChange, onSortChange }
           let activeClass = 'bg-white hover:bg-slate-50 text-text-secondary border border-surface-border';
           if (isActive) {
             if (f.key === 'red_flag') activeClass = 'bg-red-100 text-red-700 border border-red-300';
-            else if (f.key === 'waiting') activeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
-            else if (f.key === 'in_progress') activeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
-            else if (f.key === 'completed') activeClass = 'bg-slate-100 text-text-secondary border border-slate-300';
+            else if (f.key === 'WAITING') activeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
+            else if (f.key === 'IN_PROGRESS') activeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
+            else if (f.key === 'COMPLETED') activeClass = 'bg-slate-100 text-text-secondary border border-slate-300';
             else activeClass = 'bg-brand-light text-brand border border-brand/20';
           }
           return (

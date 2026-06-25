@@ -35,32 +35,32 @@ export function QueueConfirmation({ result, phone, onReset }: QueueConfirmationP
         <div className="border-t border-brand/10 pt-3 flex justify-between items-center">
           <span className="text-xs text-text-secondary font-medium">Estimated wait</span>
           <span className="text-base font-bold text-text-primary">
-            {result.estimatedWait > 0 ? `~ ${result.estimatedWait} minutes` : 'Immediate'}
+            {result.estimatedWaitMinutes > 0 ? `~ ${result.estimatedWaitMinutes} minutes` : 'Immediate'}
           </span>
         </div>
 
         <div className="flex justify-between items-center">
           <span className="text-xs text-text-secondary font-medium">Triage Status</span>
           <span className={`px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-            result.status === 'completed'
+            result.status === 'COMPLETED'
               ? 'bg-urgency-done-bg text-urgency-done-text'
-              : result.status === 'in_progress'
+              : result.status === 'IN_PROGRESS'
               ? 'bg-urgency-progress-bg text-urgency-progress-text'
               : 'bg-urgency-moderate-bg text-urgency-moderate-text'
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
-              result.status === 'completed' ? 'bg-slate-400' :
-              result.status === 'in_progress' ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'
+              result.status === 'COMPLETED' ? 'bg-slate-400' :
+              result.status === 'IN_PROGRESS' ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'
             }`} />
-            {result.status === 'completed' ? 'Completed' :
-             result.status === 'in_progress' ? 'Attending' : 'Waiting'}
+            {result.status === 'COMPLETED' ? 'Completed' :
+             result.status === 'IN_PROGRESS' ? 'Attending' : 'Waiting'}
           </span>
         </div>
 
-        {result.position !== undefined && result.status === 'waiting' && (
+        {result.queuePosition !== undefined && result.status === 'WAITING' && (
           <div className="border-t border-brand/10 pt-3 flex justify-between items-center text-xs">
             <span className="text-text-secondary">Queue Position</span>
-            <span className="font-bold text-brand-dark">#{result.position} ahead</span>
+            <span className="font-bold text-brand-dark">#{result.queuePosition} ahead</span>
           </div>
         )}
       </div>

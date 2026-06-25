@@ -16,15 +16,15 @@ interface PatientCardProps {
   onToggleExpand: () => void;
   onConfirmPriority: () => void;
   onOpenOverride: () => void;
-  onUpdateStatus: (status: 'waiting' | 'in_progress' | 'completed' | 'escalated') => void;
+  onUpdateStatus: (status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'ESCALATED') => void;
   onSaveNotes: (notes: string) => void;
   onStaffNotesChange: (val: string) => void;
 }
 
 function getPriorityColors(pClass: string, isEsc: boolean) {
   if (isEsc) return { bg: 'bg-urgency-urgent-bg', border: 'border-red-400', text: 'text-urgency-urgent-text' };
-  if (pClass === 'urgent') return { bg: 'bg-urgency-urgent-bg', border: 'border-urgency-urgent-border', text: 'text-urgency-urgent-text' };
-  if (pClass === 'moderate') return { bg: 'bg-urgency-moderate-bg', border: 'border-urgency-moderate-border', text: 'text-urgency-moderate-text' };
+  if (pClass === 'HIGH') return { bg: 'bg-urgency-urgent-bg', border: 'border-urgency-urgent-border', text: 'text-urgency-urgent-text' };
+  if (pClass === 'MEDIUM') return { bg: 'bg-urgency-moderate-bg', border: 'border-urgency-moderate-border', text: 'text-urgency-moderate-text' };
   return { bg: 'bg-urgency-minor-bg', border: 'border-urgency-minor-border', text: 'text-urgency-minor-text' };
 }
 
@@ -41,7 +41,7 @@ export function PatientCard({
   onStaffNotesChange,
 }: PatientCardProps) {
   const priority = patient.confirmedPriority || patient.aiSuggestedPriority;
-  const priorityStyles = getPriorityColors(priority, patient.status === 'escalated');
+  const priorityStyles = getPriorityColors(priority, patient.status === 'ESCALATED');
   const arrivalTime = new Date(patient.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const minutesElapsed = currentTime > 0
     ? Math.round((currentTime - new Date(patient.createdAt).getTime()) / (60 * 1000))
@@ -50,10 +50,10 @@ export function PatientCard({
   return (
     <div
       className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all duration-300 ${
-        patient.status === 'escalated' ? 'border-red-500 bg-red-50/10' : isExpanded ? 'border-brand' : 'border-surface-border'
+        patient.status === 'ESCALATED' ? 'border-red-500 bg-red-50/10' : isExpanded ? 'border-brand' : 'border-surface-border'
       }`}
     >
-      {patient.status === 'escalated' && (
+      {patient.status === 'ESCALATED' && (
         <div className="bg-red-600 text-white text-[10px] font-bold tracking-widest uppercase py-1 px-4 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -69,10 +69,10 @@ export function PatientCard({
       >
         <div className="flex items-center gap-3.5 min-w-0">
           <div className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${priorityStyles.bg} ${priorityStyles.border} ${priorityStyles.text}`}>
-            {patient.status === 'escalated' ? <AlertTriangle className="w-5 h-5 text-red-600" /> :
-             patient.status === 'in_progress' ? <Stethoscope className="w-5 h-5 text-blue-600" /> :
-             priority === 'urgent' ? <AlertTriangle className="w-5 h-5" /> :
-             priority === 'moderate' ? <MoreHorizontal className="w-5 h-5" /> :
+            {patient.status === 'ESCALATED' ? <AlertTriangle className="w-5 h-5 text-red-600" /> :
+             patient.status === 'IN_PROGRESS' ? <Stethoscope className="w-5 h-5 text-blue-600" /> :
+             priority === 'HIGH' ? <AlertTriangle className="w-5 h-5" /> :
+             priority === 'MEDIUM' ? <MoreHorizontal className="w-5 h-5" /> :
              <CheckCircle className="w-5 h-5" />}
           </div>
 
@@ -98,14 +98,14 @@ export function PatientCard({
 
         <div className="flex items-center gap-3 shrink-0">
           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-            patient.status === 'completed' ? 'bg-urgency-done-bg text-urgency-done-text border border-slate-200' :
-            patient.status === 'in_progress' ? 'bg-urgency-progress-bg text-urgency-progress-text border border-blue-200' :
-            patient.status === 'escalated' ? 'bg-red-100 text-red-800 border border-red-300' :
+            patient.status === 'COMPLETED' ? 'bg-urgency-done-bg text-urgency-done-text border border-slate-200' :
+            patient.status === 'IN_PROGRESS' ? 'bg-urgency-progress-bg text-urgency-progress-text border border-blue-200' :
+            patient.status === 'ESCALATED' ? 'bg-red-100 text-red-800 border border-red-300' :
             'bg-urgency-moderate-bg text-urgency-moderate-text border border-amber-200'
           }`}>
-            {patient.status === 'completed' ? 'Completed' :
-             patient.status === 'in_progress' ? 'Attending' :
-             patient.status === 'escalated' ? 'Escalated' : 'Waiting'}
+            {patient.status === 'COMPLETED' ? 'Completed' :
+             patient.status === 'IN_PROGRESS' ? 'Attending' :
+             patient.status === 'ESCALATED' ? 'Escalated' : 'Waiting'}
           </span>
           {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </div>
@@ -129,8 +129,8 @@ export function PatientCard({
               <div>
                 <span className="text-text-tertiary">AI-Suggested Priority:</span>
                 <span className={`ml-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                  patient.aiSuggestedPriority === 'urgent' ? 'bg-red-50 text-red-700' :
-                  patient.aiSuggestedPriority === 'moderate' ? 'bg-amber-50 text-amber-700' :
+                  patient.aiSuggestedPriority === 'HIGH' ? 'bg-red-50 text-red-700' :
+                  patient.aiSuggestedPriority === 'MEDIUM' ? 'bg-amber-50 text-amber-700' :
                   'bg-teal-50 text-teal-700'
                 }`}>
                   {patient.aiSuggestedPriority}
@@ -191,7 +191,7 @@ export function PatientCard({
               </div>
             )}
 
-            {patient.status === 'in_progress' && (
+            {patient.status === 'IN_PROGRESS' && (
               <div className="space-y-2 border-t border-slate-100 pt-3">
                 <label className="block text-xs font-bold text-text-secondary uppercase">Clinical Notes & Observations</label>
                 <textarea
@@ -219,7 +219,7 @@ export function PatientCard({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2.5 pt-2 border-t border-slate-200/60 justify-end">
-            {patient.status === 'waiting' && (
+            {patient.status === 'WAITING' && (
               <>
                 <button
                   onClick={onConfirmPriority}
@@ -234,13 +234,13 @@ export function PatientCard({
                   Override Priority
                 </button>
                 <button
-                  onClick={() => onUpdateStatus('in_progress')}
+                  onClick={() => onUpdateStatus('IN_PROGRESS')}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition"
                 >
                   Mark Attending
                 </button>
                 <button
-                  onClick={() => onUpdateStatus('escalated')}
+                  onClick={() => onUpdateStatus('ESCALATED')}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-800 hover:bg-red-200 border border-red-300 transition flex items-center gap-1.5"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -249,16 +249,16 @@ export function PatientCard({
               </>
             )}
 
-            {patient.status === 'escalated' && (
+            {patient.status === 'ESCALATED' && (
               <>
                 <button
-                  onClick={() => onUpdateStatus('in_progress')}
+                  onClick={() => onUpdateStatus('IN_PROGRESS')}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition"
                 >
                   Mark Attending
                 </button>
                 <button
-                  onClick={() => onUpdateStatus('completed')}
+                  onClick={() => onUpdateStatus('COMPLETED')}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
                 >
                   Mark Completed
@@ -266,16 +266,16 @@ export function PatientCard({
               </>
             )}
 
-            {patient.status === 'in_progress' && (
+            {patient.status === 'IN_PROGRESS' && (
               <button
-                onClick={() => onUpdateStatus('completed')}
+                onClick={() => onUpdateStatus('COMPLETED')}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
               >
                 Mark Completed
               </button>
             )}
 
-            {patient.status === 'completed' && (
+            {patient.status === 'COMPLETED' && (
               <span className="text-xs text-text-tertiary italic flex items-center gap-1">
                 <CheckCircle className="w-3.5 h-3.5 text-brand" />
                 <span>Consultation closed at {patient.completedAt ? new Date(patient.completedAt).toLocaleTimeString() : 'N/A'}</span>

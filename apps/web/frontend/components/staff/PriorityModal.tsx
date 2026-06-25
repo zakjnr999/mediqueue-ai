@@ -28,9 +28,9 @@ export function PriorityModal({
   if (!patient) return null;
 
   const options: { value: PatientPriority; label: string; description: string }[] = [
-    { value: 'minor', label: 'Minor Priority', description: 'Stable condition. Routine clinical assessment queue.' },
-    { value: 'moderate', label: 'Moderate Priority', description: 'Requires secondary nurse screening. Checked periodically.' },
-    { value: 'urgent', label: 'Urgent Priority', description: 'Immediate examination. Pushes to head of waiting list.' },
+    { value: 'LOW', label: 'Low Priority', description: 'Stable condition. Routine clinical assessment queue.' },
+    { value: 'MEDIUM', label: 'Medium Priority', description: 'Requires secondary nurse screening. Checked periodically.' },
+    { value: 'HIGH', label: 'High Priority', description: 'Immediate examination. Pushes to head of waiting list.' },
   ];
 
   return (

@@ -12,22 +12,22 @@ export const SYMPTOM_LIST = [
 ] as const;
 
 export const URGENCY_LABELS = {
-  minor: 'Minor',
-  moderate: 'Moderate',
-  urgent: 'Urgent',
+  Minor: 'Minor',
+  Moderate: 'Moderate',
+  Urgent: 'Urgent',
 } as const;
 
 export const PRIORITY_LABELS = {
-  minor: 'Minor',
-  moderate: 'Moderate',
-  urgent: 'Urgent',
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
 } as const;
 
 export const STATUS_LABELS: Record<string, string> = {
-  waiting: 'Waiting',
-  in_progress: 'Attending',
-  completed: 'Completed',
-  escalated: 'Escalated',
+  WAITING: 'Waiting',
+  IN_PROGRESS: 'Attending',
+  COMPLETED: 'Completed',
+  ESCALATED: 'Escalated',
 };
 
 export const POLLING_INTERVALS = {

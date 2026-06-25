@@ -3,10 +3,10 @@ import { apiGet } from './api-client';
 export interface QueueData {
   patients: any[];
   stats: {
-    inQueue: number;
-    avgWait: number;
-    redFlags: number;
-    seenToday: number;
+    patientsInQueue: number;
+    averageWaitMinutes: number;
+    redFlagCount: number;
+    seenTodayCount: number;
   };
 }
 

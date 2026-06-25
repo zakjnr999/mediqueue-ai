@@ -94,9 +94,9 @@ export function ReviewConfirm({ form, isSubmitting, onBack, onEditStep, onSubmit
             <div>
               <p className="text-text-tertiary">Self-rated urgency</p>
               <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                form.selfUrgency === 'urgent'
+                form.selfUrgency === 'Urgent'
                   ? 'bg-urgency-urgent-bg text-urgency-urgent-text'
-                  : form.selfUrgency === 'moderate'
+                  : form.selfUrgency === 'Moderate'
                   ? 'bg-urgency-moderate-bg text-urgency-moderate-text'
                   : 'bg-urgency-minor-bg text-urgency-minor-text'
               }`}>

@@ -14,7 +14,7 @@ const INITIAL_FORM: PatientFormState = {
   sex: '',
   symptoms: [],
   freeText: '',
-  selfUrgency: 'minor',
+  selfUrgency: 'Minor',
 };
 
 interface UseCheckinReturn {
@@ -98,10 +98,9 @@ export function useCheckin(): UseCheckinReturn {
         setResult({
           patientId: response.data.patientId,
           queueNumber: response.data.queueNumber,
-          estimatedWait: response.data.estimatedWait,
-          status: response.data.status,
-          position: response.data.position,
-          name: response.data.name,
+          estimatedWaitMinutes: response.data.estimatedWaitMinutes,
+          status: response.data.status as import('@/types/patient').PatientStatus,
+          queuePosition: response.data.queuePosition,
         });
         setStep('P4');
       } else {
@@ -126,10 +125,9 @@ export function useCheckin(): UseCheckinReturn {
         setResult({
           patientId: data.data.patientId,
           queueNumber: data.data.queueNumber,
-          estimatedWait: data.data.estimatedWait ?? 0,
-          status: data.data.status,
-          position: data.data.position,
-          name: data.data.name,
+          estimatedWaitMinutes: data.data.estimatedWaitMinutes ?? 0,
+          status: data.data.status as import('@/types/patient').PatientStatus,
+          queuePosition: data.data.queuePosition ?? 0,
         });
         setStep('P4');
       } else {

@@ -5,10 +5,9 @@ export interface CheckinSubmitResponse {
   data: {
     patientId: string;
     queueNumber: string;
-    estimatedWait: number;
+    estimatedWaitMinutes: number;
+    queuePosition: number;
     status: string;
-    position?: number;
-    name?: string;
   };
 }
 

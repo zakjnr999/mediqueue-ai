@@ -83,7 +83,7 @@ export default function Home() {
 
   // Override priority modal state (S3)
   const [overridePatient, setOverridePatient] = useState<typeof patients[number] | null>(null);
-  const [overridePriorityValue, setOverridePriorityValue] = useState<PatientPriority>('minor');
+  const [overridePriorityValue, setOverridePriorityValue] = useState<PatientPriority>('LOW');
   const [overrideReason, setOverrideReason] = useState('');
   const [isSavingOverride, setIsSavingOverride] = useState(false);
 
