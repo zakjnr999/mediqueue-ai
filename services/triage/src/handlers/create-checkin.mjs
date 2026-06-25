@@ -41,7 +41,8 @@ export function createHandler(dependencies) {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
   if (dependencies.getDocClientFn) {
-    const required = ['analyseSymptomsFn', 'generateQueueNumberFn', 'savePatientFn', 'countPeopleAheadFn', 'generateIdFn', 'nowFn'];
+    // Only the deps that cannot be built from getDocClientFn must be supplied
+    const required = ['analyseSymptomsFn', 'generateIdFn', 'nowFn'];
     for (const name of required) {
       if (typeof dependencies[name] !== 'function') {
         throw new Error(`Dependency "${name}" must be a function`);
@@ -99,6 +100,19 @@ export function createHandler(dependencies) {
       });
     } catch (err) {
       if (err instanceof CheckinError) {
+        // Suppress internal implementation details from client-facing messages.
+        // Infrastructure errors (e.g. QUEUE_NUMBER_ERROR, DATABASE_ERROR) may contain
+        // raw AWS messages, table names, or function signatures — return a safe
+        // generic message for those categories while keeping stable error codes.
+        const SAFE_INTERNAL_CODES = new Set([
+          'QUEUE_NUMBER_ERROR',
+          'DATABASE_ERROR',
+          'TRIAGE_PROCESSING_ERROR'
+        ]);
+        const safeMessage = SAFE_INTERNAL_CODES.has(err.code)
+          ? 'Unable to complete patient check-in'
+          : err.message;
+
         console.warn("Request failed", {
           code: err.code,
           requestId: context?.awsRequestId,
@@ -107,7 +121,7 @@ export function createHandler(dependencies) {
           success: false,
           error: {
             code: err.code,
-            message: err.message
+            message: safeMessage
           }
         });
       }
@@ -126,13 +140,23 @@ export function createHandler(dependencies) {
   };
 }
 
+// Production dependencies.
+// analyseSymptomsFn is injected directly — its signature (symptomsData) already
+// matches the service-facing contract.
+//
+// generateQueueNumberFn, savePatientFn, and countPeopleAheadFn are intentionally
+// NOT provided here. The handler's internal adapter wrappers (lines 77-88) will
+// build correctly-bound closures from getDocClientFn, PATIENTS_TABLE_NAME, and
+// PATIENTS_QUEUE_INDEX_NAME at invocation time.
+//
+// Injecting the raw repository functions directly would bypass those wrappers
+// (due to the || short-circuit) and cause infrastructure arguments such as
+// docClient and tableName to be missing — producing errors like:
+//   "docClient.send is not a function"
 const prodDeps = Object.freeze({
   serviceFn: createCheckinService,
   getDocClientFn: getDocClient,
   analyseSymptomsFn: analyseSymptoms,
-  generateQueueNumberFn: generateQueueNumber,
-  savePatientFn: savePatientCheckin,
-  countPeopleAheadFn: countPeopleAhead,
   generateIdFn: () => crypto.randomUUID(),
   nowFn: () => new Date()
 });
