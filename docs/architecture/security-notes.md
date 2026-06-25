@@ -11,7 +11,7 @@ To comply with HIPAA (Health Insurance Portability and Accountability Act) and r
 ### PII Stripping Rule
 * **Amazon Bedrock AI** is a decision-support tool. Under no circumstances are patient identity parameters (Full Name, Phone number) transmitted to Bedrock model endpoints.
 * During check-in, the API Gateway/Lambda handler parses the payload.
-* **DynamoDB Write**: Saves the full payload (including `fullName` and `phoneNumber`) to the secure database partition.
+* **DynamoDB Write**: Saves the full payload (including `fullName` and `phoneNumber`) as plain text to the secure database partition.
 * **Bedrock Payload**: Only packages `age`, selected `symptoms` tags, and `additionalDetails` text to send to Amazon Bedrock. This prevents model training or caching from capturing personal identities.
 
 ---
@@ -21,13 +21,12 @@ To comply with HIPAA (Health Insurance Portability and Accountability Act) and r
 Access to the Staff Dashboard and clinical overrides is restricted to authorized operators.
 
 ### 2.1 Amazon Cognito User Pools
-* Hospital coordinators and triage nurses must log in via a secure endpoint managed by **Amazon Cognito**.
-* Cognito issues JSON Web Tokens (JWT) containing staff scope groups (e.g. `TriageNurse`, `ClinicalOperator`).
-* API Gateway endpoints (`PATCH /patients/{id}/priority`, `PATCH /patients/{id}/status`) validate the JWT token header.
+* Hospital staff must log in via a secure endpoint managed by **Amazon Cognito** to access protected resources.
+* Cognito issues JSON Web Tokens (JWT) upon successful authentication.
+* API Gateway endpoints (`PATCH /patients/{id}/priority`, `PATCH /patients/{id}/status`, `GET /queue`, etc.) check the authorization header to validate user identity.
 
-### 2.2 Role-Based Access Control (RBAC)
-* **TriageNurse / Coordinator**: Full access to review the queue, input overrides, escalate patients, and update queue statuses.
-* **Read-Only / Reception**: Access to query the queue list (`GET /queue`) but blocked from patching priority levels or status updates.
+### 2.2 Access Control
+* Authenticated staff users are authorized to view the queue, input overrides, escalate patients, and update patient queue statuses.
 
 ---
 
@@ -38,5 +37,6 @@ Access to the Staff Dashboard and clinical overrides is restricted to authorized
 * Direct AWS console logins require HTTPS.
 
 ### 3.2 Encryption at Rest
-* **Amazon DynamoDB**: Configured with AWS Key Management Service (KMS) encryption at rest using customer-managed keys (CMK) or AWS-managed keys.
+* **Amazon DynamoDB**: Configured with default service-side encryption at rest using AWS-managed keys (KMS).
 * **Local Storage / Session Cache**: Patient queue tokens stored in the browser's `localStorage` contain only UUID session references (`patientId`), not PHI attributes.
+

@@ -8,17 +8,17 @@ MediQueue AI is built on a fully serverless, highly available AWS architecture. 
 
 ```text
                      +-----------------------+
-                     |  Patient Web Portal   | <---+ (Hosted via Amplify)
-                     +-----------------------+     |
-                                 |                 | (SMS notifications)
-                                 v                 |
-                     +-----------------------+     |
-                     |  Amazon API Gateway   |     |
-                     +-----------------------+     |
-                                 |                 |
-                                 v                 |
-+-------------------+ +-----------------------+    |
-|   Amazon Cognito  | |      AWS Lambda       | ---+ (Trigger)
+                     |  Patient Web Portal   | (Hosted via Amplify)
+                     +-----------------------+
+                                 |
+                                 v
+                     +-----------------------+
+                     |  Amazon API Gateway   |
+                     +-----------------------+
+                                 |
+                                 v
++-------------------+ +-----------------------+
+|   Amazon Cognito  | |      AWS Lambda       |
 +-------------------+ +-----------------------+
     (Auth tokens)                |
                                  +----------+----------+
@@ -34,7 +34,7 @@ MediQueue AI is built on a fully serverless, highly available AWS architecture. 
 ## 2. Service Roles & Configurations
 
 ### 2.1 Amazon Bedrock
-* **Model ID**: `amazon.nova-lite-v1:0` (or region-appropriate lightweight model).
+* **Model ID**: `amazon.nova-2-lite-v1:0` (or region-appropriate lightweight model).
 * **Role**: Evaluates age and symptom tags, performs pattern-matching check for clinical red flags, generates a concise case summary, and suggests a recommended triage priority level.
 * **Region**: `us-west-2` (configured in env setup).
 
@@ -52,7 +52,7 @@ MediQueue AI is built on a fully serverless, highly available AWS architecture. 
 * **Role**: Stores patient details, check-in history, dynamic queue sequences, and staff audit trails. Utilizes Global Secondary Indexes (GSIs) for fast list queries.
 
 ### 2.5 Amazon Cognito
-* **Role**: Provides secure clinical user sign-ins, JWT session signing, password resets, and user group roles (Triage nurse vs. general coordinator).
+* **Role**: Provides secure clinical user sign-ins, JWT session signing, and password resets.
 
 ### 2.6 AWS Amplify
 * **Role**: Continuous deployment and hosting for the Next.js single-page responsive web application.

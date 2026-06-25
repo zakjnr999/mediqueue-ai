@@ -19,8 +19,8 @@ The database uses a single-table design format with a simple partition key to ma
 | `entityType` | String | Hardcoded to `PATIENT_CHECKIN`. |
 | `patientId` | String | Unique UUID v4 for the check-in session. |
 | `queueNumber` | String | Structured chronological ticket ID (e.g. `MQ-20260624-0017`). |
-| `fullName` | String | Patient's full name (kept encrypted/unshared with AI). |
-| `phoneNumber` | String | Patient's phone number (kept encrypted/unshared with AI). |
+| `fullName` | String | Patient's full name (kept unshared with AI / stripped during triage). |
+| `phoneNumber` | String | Patient's phone number (kept unshared with AI / stripped during triage). |
 | `sex` | String | Patient's gender: `Male`, `Female`, or `Prefer not to say`. |
 | `age` | Number | Patient's age in years. |
 | `symptoms` | List (Strings) | Selected symptom tags. |
