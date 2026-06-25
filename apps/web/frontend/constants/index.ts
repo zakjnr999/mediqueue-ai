@@ -37,7 +37,4 @@ export const POLLING_INTERVALS = {
 
 export const CLINIC_NAME = 'Ridge Regional Clinic';
 
-export const DEMO_CREDENTIALS = {
-  email: 'nurse@healthcentre.gh',
-  password: 'password123',
-} as const;
+
