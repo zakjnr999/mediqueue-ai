@@ -61,6 +61,12 @@ export function StaffDashboard() {
     handleLogout,
   } = useStaffAuth(refreshQueue);
 
+  // Load queue immediately when a staff session is restored after refresh.
+  useEffect(() => {
+    if (!isStaffLoggedIn) return;
+    void refreshQueue();
+  }, [isStaffLoggedIn, refreshQueue]);
+
   // ── Auto-refresh queue every 20s when logged in ──────────────
   useEffect(() => {
     if (!isStaffLoggedIn) return;
