@@ -38,15 +38,6 @@ export function createHandler(dependencies) {
   if (dependencies.getDocClientFn !== undefined && typeof dependencies.getDocClientFn !== 'function') {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
-  if (dependencies.getDocClientFn) {
-    const required = ['getPatientDetailsFn', 'countPeopleAheadFn'];
-    for (const name of required) {
-      if (typeof dependencies[name] !== 'function') {
-        throw new Error(`Dependency "${name}" must be a function`);
-      }
-    }
-  }
-
   return async function handleRequest(event, context) {
     console.log('Patient details request received');
 
@@ -86,11 +77,18 @@ export function createHandler(dependencies) {
           code: err.code,
           requestId: context?.awsRequestId,
         });
+        const SAFE_INTERNAL_CODES = new Set([
+          'DATABASE_ERROR',
+          'CONFIGURATION_ERROR'
+        ]);
+        const safeMessage = SAFE_INTERNAL_CODES.has(err.code)
+          ? 'Unable to process request'
+          : err.message;
         return apiResponse(err.statusCode, {
           success: false,
           error: {
             code: err.code,
-            message: err.message
+            message: safeMessage
           }
         });
       }
@@ -111,9 +109,7 @@ export function createHandler(dependencies) {
 
 const prodDeps = Object.freeze({
   serviceFn: getPatientService,
-  getDocClientFn: getDocClient,
-  getPatientDetailsFn: getPatientDetails,
-  countPeopleAheadFn: countPeopleAhead
+  getDocClientFn: getDocClient
 });
 
 export const handler = createHandler(prodDeps);

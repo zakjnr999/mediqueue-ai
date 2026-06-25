@@ -39,7 +39,7 @@ export function createHandler(dependencies) {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
   if (dependencies.getDocClientFn) {
-    const required = ['queryAllPatientsForDateFn', 'nowFn'];
+    const required = ['nowFn'];
     for (const name of required) {
       if (typeof dependencies[name] !== 'function') {
         throw new Error(`Dependency "${name}" must be a function`);
@@ -84,11 +84,18 @@ export function createHandler(dependencies) {
           code: err.code,
           requestId: context?.awsRequestId,
         });
+        const SAFE_INTERNAL_CODES = new Set([
+          'DATABASE_ERROR',
+          'CONFIGURATION_ERROR'
+        ]);
+        const safeMessage = SAFE_INTERNAL_CODES.has(err.code)
+          ? 'Unable to process request'
+          : err.message;
         return apiResponse(err.statusCode, {
           success: false,
           error: {
             code: err.code,
-            message: err.message
+            message: safeMessage
           }
         });
       }
@@ -110,7 +117,6 @@ export function createHandler(dependencies) {
 const prodDeps = Object.freeze({
   serviceFn: getStatsService,
   getDocClientFn: getDocClient,
-  queryAllPatientsForDateFn: queryAllPatientsForDate,
   nowFn: () => new Date()
 });
 

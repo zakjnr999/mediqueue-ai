@@ -40,7 +40,7 @@ export function createHandler(dependencies) {
     throw new Error('Dependency "getDocClientFn" must be a function');
   }
   if (dependencies.getDocClientFn) {
-    const required = ['queryPatientQueueFn', 'serializeTokenFn', 'deserializeTokenFn', 'nowFn'];
+    const required = ['serializeTokenFn', 'deserializeTokenFn', 'nowFn'];
     for (const name of required) {
       if (typeof dependencies[name] !== 'function') {
         throw new Error(`Dependency "${name}" must be a function`);
@@ -63,13 +63,10 @@ export function createHandler(dependencies) {
       }
 
       const queryParams = event.queryStringParameters || {};
-      const limit = queryParams.limit ? parseInt(queryParams.limit, 10) : undefined;
-      const startKey = queryParams.startKey ? queryParams.startKey : undefined;
-      const sortBy = queryParams.sortBy ? queryParams.sortBy : undefined;
 
       const client = dependencies.getDocClientFn ? dependencies.getDocClientFn() : null;
       const deps = {
-        queryPatientQueueFn: dependencies.getDocClientFn ? (async ({ dateStr, limit, exclusiveStartKey: startKey }) => {
+        queryPatientQueueFn: dependencies.queryPatientQueueFn || (dependencies.getDocClientFn ? (async ({ dateStr, limit, exclusiveStartKey }) => {
           return await queryPatientQueue(
             client,
             tableName,
@@ -77,10 +74,10 @@ export function createHandler(dependencies) {
             {
               dateStr,
               limit,
-              exclusiveStartKey: startKey
+              exclusiveStartKey
             }
           );
-        }) : dependencies.queryPatientQueueFn,
+        }) : null),
         serializeTokenFn: dependencies.serializeTokenFn || serializeToken,
         deserializeTokenFn: dependencies.deserializeTokenFn || deserializeToken,
         nowFn: dependencies.nowFn || (() => new Date())
@@ -99,11 +96,18 @@ export function createHandler(dependencies) {
           code: err.code,
           requestId: context?.awsRequestId,
         });
+        const SAFE_INTERNAL_CODES = new Set([
+          'DATABASE_ERROR',
+          'CONFIGURATION_ERROR'
+        ]);
+        const safeMessage = SAFE_INTERNAL_CODES.has(err.code)
+          ? 'Unable to process request'
+          : err.message;
         return apiResponse(err.statusCode, {
           success: false,
           error: {
             code: err.code,
-            message: err.message
+            message: safeMessage
           }
         });
       }
@@ -125,7 +129,6 @@ export function createHandler(dependencies) {
 const prodDeps = Object.freeze({
   serviceFn: getQueueService,
   getDocClientFn: getDocClient,
-  queryPatientQueueFn: queryPatientQueue,
   serializeTokenFn: serializeToken,
   deserializeTokenFn: deserializeToken,
   nowFn: () => new Date()
