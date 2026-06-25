@@ -921,3 +921,188 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
     }
   });
 });
+
+test('GET /queue - Regression and Adapter Verification Tests', async (t) => {
+  const fixedNow = () => new Date('2026-06-23T14:30:00.000Z');
+  const validUUID = '550e8400-e29b-41d4-a716-446655440000';
+
+  await t.test('production-style adapter correctly translates service options to queryPatientQueue arguments', async () => {
+    const origTable = process.env.PATIENTS_TABLE_NAME;
+    const origIndex = process.env.PATIENTS_QUEUE_INDEX_NAME;
+    process.env.PATIENTS_TABLE_NAME = 'ProdTable';
+    process.env.PATIENTS_QUEUE_INDEX_NAME = 'ProdIndex';
+
+    const recordedInputs = [];
+    const mockClient = {
+      send: async (command) => {
+        recordedInputs.push(command.input);
+        return {
+          Items: [
+            {
+              entityType: 'PATIENT_CHECKIN',
+              patientId: validUUID,
+              queueNumber: 'MQ-1',
+              fullName: 'Bob Tester',
+              age: 40,
+              status: 'WAITING',
+              createdAt: '2026-06-23T12:00:00.000Z',
+              aiAssessment: { summary: 'S', redFlags: [] },
+              staffDecision: { confirmedPriority: null }
+            }
+          ],
+          LastEvaluatedKey: undefined
+        };
+      }
+    };
+
+    const token = serializeToken(
+      { id: `PATIENT#${validUUID}`, gsi1pk: 'QUEUE#2026-06-23', gsi1sk: `2026-06-23T12:00:00.000Z#${validUUID}` },
+      '2026-06-23'
+    );
+
+    const handler = createGetQueueHandler({
+      serviceFn: getQueueService,
+      getDocClientFn: () => mockClient,
+      queryPatientQueueFn: queryPatientQueue,
+      serializeTokenFn: serializeToken,
+      deserializeTokenFn: deserializeToken,
+      nowFn: fixedNow
+    });
+
+    const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
+      queryStringParameters: {
+        date: '2026-06-23',
+        limit: '15',
+        nextToken: token
+      }
+    };
+
+    const res = await handler(event, {});
+    assert.equal(res.statusCode, 200);
+
+    const body = JSON.parse(res.body);
+    assert.equal(body.success, true);
+    assert.equal(body.data.patients.length, 1);
+
+    // Verify all parts of query mapping
+    assert.equal(recordedInputs.length, 1);
+    const input = recordedInputs[0];
+    assert.equal(input.TableName, 'ProdTable');
+    assert.equal(input.IndexName, 'ProdIndex');
+    assert.equal(input.Limit, 15);
+    assert.deepEqual(input.ExpressionAttributeValues, { ':pk': 'QUEUE#2026-06-23' });
+    assert.deepEqual(input.ExclusiveStartKey, {
+      id: `PATIENT#${validUUID}`,
+      gsi1pk: 'QUEUE#2026-06-23',
+      gsi1sk: `2026-06-23T12:00:00.000Z#${validUUID}`
+    });
+
+    process.env.PATIENTS_TABLE_NAME = origTable;
+    process.env.PATIENTS_QUEUE_INDEX_NAME = origIndex;
+  });
+
+  await t.test('undefined pagination key remains undefined', async () => {
+    const origTable = process.env.PATIENTS_TABLE_NAME;
+    const origIndex = process.env.PATIENTS_QUEUE_INDEX_NAME;
+    process.env.PATIENTS_TABLE_NAME = 'ProdTable';
+    process.env.PATIENTS_QUEUE_INDEX_NAME = 'ProdIndex';
+
+    const recordedInputs = [];
+    const mockClient = {
+      send: async (command) => {
+        recordedInputs.push(command.input);
+        return { Items: [], LastEvaluatedKey: undefined };
+      }
+    };
+
+    const handler = createGetQueueHandler({
+      serviceFn: getQueueService,
+      getDocClientFn: () => mockClient,
+      queryPatientQueueFn: queryPatientQueue,
+      serializeTokenFn: serializeToken,
+      deserializeTokenFn: deserializeToken,
+      nowFn: fixedNow
+    });
+
+    const event = {
+      headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
+      queryStringParameters: {
+        date: '2026-06-23'
+      }
+    };
+
+    const res = await handler(event, {});
+    assert.equal(res.statusCode, 200);
+    assert.equal(recordedInputs.length, 1);
+    const input = recordedInputs[0];
+    assert.equal(input.ExclusiveStartKey, undefined);
+
+    process.env.PATIENTS_TABLE_NAME = origTable;
+    process.env.PATIENTS_QUEUE_INDEX_NAME = origIndex;
+  });
+
+  await t.test('unknown repository failures return 500 INTERNAL_ERROR and log safely', async () => {
+    const origTable = process.env.PATIENTS_TABLE_NAME;
+    const origIndex = process.env.PATIENTS_QUEUE_INDEX_NAME;
+    process.env.PATIENTS_TABLE_NAME = 'ProdTable';
+    process.env.PATIENTS_QUEUE_INDEX_NAME = 'ProdIndex';
+
+    const originalConsoleError = console.error;
+    let errorLogs = [];
+    console.error = (...args) => {
+      errorLogs.push(args.map(arg => typeof arg === 'string' ? arg : (arg instanceof Error ? arg.toString() + '\n' + arg.stack : JSON.stringify(arg))).join(' '));
+    };
+
+    try {
+      // Inject a raw non-ApiError at the queryPatientQueueFn level.
+      // This bypasses the repository's ApiError wrapper and lands directly
+      // in the handler's unhandled-error catch branch, which should respond
+      // with INTERNAL_ERROR and suppress the raw message/stack from both
+      // the response body and the console log.
+      const rawSecret = 'SensitiveAWSConnectionFailure: AccountId=123456789012, ARN=arn:aws:dynamodb:us-west-2:123456789012:table/ProdTable';
+      const mockDeps = {
+        serviceFn: getQueueService,
+        queryPatientQueueFn: async () => {
+          const err = new Error(rawSecret);
+          err.stack = `SensitiveAWSConnectionFailure\n    at Object.send (some-file.js:10:20)`;
+          throw err;
+        },
+        serializeTokenFn: serializeToken,
+        deserializeTokenFn: deserializeToken,
+        nowFn: fixedNow
+      };
+
+      const handler = createGetQueueHandler(mockDeps);
+
+      const event = {
+        headers: { Authorization: 'Bearer mock-token-test@hospital.com' }
+      };
+
+      const res = await handler(event, {});
+      assert.equal(res.statusCode, 500);
+
+      const body = JSON.parse(res.body);
+      assert.equal(body.success, false);
+      assert.equal(body.error.code, 'INTERNAL_ERROR');
+      assert.equal(body.error.message, 'An unexpected internal error occurred');
+
+      assert.ok(!res.body.includes('SensitiveAWSConnectionFailure'));
+      assert.ok(!res.body.includes('123456789012'));
+      assert.ok(!res.body.includes('arn:aws'));
+      assert.ok(!res.body.includes('stack'));
+
+      assert.equal(errorLogs.length, 1);
+      const logMsg = errorLogs[0];
+      assert.ok(!logMsg.includes('SensitiveAWSConnectionFailure'));
+      assert.ok(!logMsg.includes('123456789012'));
+      assert.ok(!logMsg.includes('arn:aws'));
+      assert.ok(!logMsg.includes('stack'));
+      assert.ok(logMsg.includes('Unhandled server error'));
+    } finally {
+      console.error = originalConsoleError;
+      process.env.PATIENTS_TABLE_NAME = origTable;
+      process.env.PATIENTS_QUEUE_INDEX_NAME = origIndex;
+    }
+  });
+});

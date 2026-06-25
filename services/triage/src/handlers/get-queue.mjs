@@ -69,9 +69,18 @@ export function createHandler(dependencies) {
 
       const client = dependencies.getDocClientFn ? dependencies.getDocClientFn() : null;
       const deps = {
-        queryPatientQueueFn: dependencies.queryPatientQueueFn || (dependencies.getDocClientFn ? (async (dateStr, limit, startKey) => {
-          return await queryPatientQueue(client, tableName, indexName, dateStr, limit, startKey);
-        }) : null),
+        queryPatientQueueFn: dependencies.getDocClientFn ? (async ({ dateStr, limit, exclusiveStartKey: startKey }) => {
+          return await queryPatientQueue(
+            client,
+            tableName,
+            indexName,
+            {
+              dateStr,
+              limit,
+              exclusiveStartKey: startKey
+            }
+          );
+        }) : dependencies.queryPatientQueueFn,
         serializeTokenFn: dependencies.serializeTokenFn || serializeToken,
         deserializeTokenFn: dependencies.deserializeTokenFn || deserializeToken,
         nowFn: dependencies.nowFn || (() => new Date())
