@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w frontend",
-    "build": "npm run build -w frontend",
+    "build": "next build frontend",
     "start": "npm run start -w frontend",
     "lint": "npm run lint -w frontend",
     "clean": "npm run clean -w frontend",
