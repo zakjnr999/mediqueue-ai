@@ -1,7 +1,37 @@
-import { apiGet, apiPatch, apiPost } from '@/lib/api/client';
+import { apiGet, apiPatch, apiPost, getIdToken } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import type { PatientDetailsResponse } from '@/types/api';
 import type { Patient, PatientStatus, PatientPriority } from '@/types/patient';
+
+/** Decode a JWT payload without verification for staff display labels only. */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function getReviewerDisplayName(): string {
+  const token = getIdToken();
+  if (!token) return 'Clinical staff';
+
+  const decoded = decodeJwtPayload(token);
+  const email = typeof decoded?.email === 'string' ? decoded.email : '';
+  const username = typeof decoded?.['cognito:username'] === 'string' ? decoded['cognito:username'] : '';
+  const label = email || username;
+
+  if (!label) return 'Clinical staff';
+  return label.split('@')[0]
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ') || 'Clinical staff';
+}
 
 /**
  * Fetch full patient details by their UUID.
@@ -99,7 +129,9 @@ export async function escalatePatientById(
   id: string,
 ): Promise<{ success: boolean }> {
   try {
-    await apiPost(ENDPOINTS.patients.escalate(id), {});
+    await apiPost(ENDPOINTS.patients.escalate(id), {
+      reviewerDisplayName: getReviewerDisplayName(),
+    });
     return { success: true };
   } catch {
     return { success: false };
@@ -135,6 +167,7 @@ export async function updatePatientState(
       await apiPatch(ENDPOINTS.patients.priority(id), {
         confirmedPriority,
         overrideReason: updates.overrideReason ?? null,
+        reviewerDisplayName: getReviewerDisplayName(),
       });
     }
     return { success: true };

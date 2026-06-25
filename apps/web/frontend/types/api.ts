@@ -116,6 +116,7 @@ export interface QueuePatientItem {
   queueNumber: string;
   fullName: string;
   age: number;
+  sex?: string;
   status: string;
   isEscalated: boolean;
   escalatedBy: string | null;

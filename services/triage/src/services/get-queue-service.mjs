@@ -92,7 +92,7 @@ export async function getQueueService(queryParams, deps = {}) {
       };
 
       // Construct exactly the approved response structure (no spread, no extra properties)
-      return {
+      const patient = {
         patientId: item.patientId || '',
         queueNumber: item.queueNumber || '',
         fullName: item.fullName || '',
@@ -104,6 +104,12 @@ export async function getQueueService(queryParams, deps = {}) {
         staffDecision,
         createdAt: item.createdAt || ''
       };
+
+      if (item.sex !== undefined && item.sex !== null) {
+        patient.sex = item.sex;
+      }
+
+      return patient;
     });
 
   // Sort patients list in-memory based on requested criteria

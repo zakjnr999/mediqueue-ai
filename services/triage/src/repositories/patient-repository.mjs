@@ -63,7 +63,7 @@ export async function queryPatientQueue(docClient, tableName, indexName, { dateS
         '#status': 'status'
       },
       // Restrict projected fields to avoid returning unapproved items or sensitive data
-      ProjectionExpression: 'patientId, queueNumber, fullName, age, #status, aiAssessment, staffDecision, createdAt, entityType, isEscalated, escalatedBy',
+      ProjectionExpression: 'patientId, queueNumber, fullName, age, sex, #status, aiAssessment, staffDecision, createdAt, entityType, isEscalated, escalatedBy',
       ScanIndexForward: true, // ASC order (first-come, first-served)
       Limit: limit
     };

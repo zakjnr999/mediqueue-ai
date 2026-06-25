@@ -23,7 +23,7 @@ function mapQueueItem(item: import('@/types/api').QueuePatientItem): Patient {
     name: item.fullName,
     phone: '',
     age: item.age,
-    sex: '',
+    sex: item.sex || '',
     symptoms: [],
     freeText: '',
     selfUrgency: 'Minor',

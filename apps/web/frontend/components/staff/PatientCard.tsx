@@ -47,6 +47,8 @@ export function PatientCard({
   const minutesElapsed = currentTime > 0
     ? Math.round((currentTime - new Date(patient.createdAt).getTime()) / (60 * 1000))
     : 0;
+  const demographics = patient.sex ? `${patient.sex}, ${patient.age}y` : `${patient.age}y`;
+  const contact = patient.phone || 'Available in patient details';
 
   return (
     <div
@@ -90,7 +92,7 @@ export function PatientCard({
             <p className="text-sm text-text-secondary mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <span className="font-mono font-bold text-brand-dark">{patient.queueNumber}</span>
               <span>•</span>
-              <span>{patient.sex}, {patient.age}y</span>
+              <span>{demographics}</span>
               <span>•</span>
               <span>Arrived {arrivalTime} ({minutesElapsed}m ago)</span>
             </p>
@@ -156,8 +158,8 @@ export function PatientCard({
           <div className="bg-white rounded-lg border border-surface-border p-4 text-sm space-y-3 shadow-inner">
             <h4 className="font-bold text-sm text-text-secondary uppercase border-b border-slate-100 pb-1.5">Patient intake details</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><p className="text-text-tertiary">Patient Contact</p><p className="font-semibold text-text-primary">{patient.phone}</p></div>
-              <div><p className="text-text-tertiary">Demographics</p><p className="font-semibold text-text-primary">{patient.sex || 'Unknown'}, {patient.age} years old</p></div>
+              <div><p className="text-text-tertiary">Patient Contact</p><p className="font-semibold text-text-primary">{contact}</p></div>
+              <div><p className="text-text-tertiary">Demographics</p><p className="font-semibold text-text-primary">{patient.sex ? `${patient.sex}, ` : ''}{patient.age} years old</p></div>
               <div><p className="text-text-tertiary">Self-assessed Urgency</p><p className="font-semibold text-text-primary uppercase">{patient.selfUrgency}</p></div>
               <div><p className="text-text-tertiary">Arrival Timestamp</p><p className="font-semibold text-text-primary">{new Date(patient.createdAt).toLocaleString()}</p></div>
             </div>

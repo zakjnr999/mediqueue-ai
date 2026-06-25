@@ -203,7 +203,7 @@ test('Staff APIs - Repository Tests', async (t) => {
         assert.equal(command.input.Limit, 10);
         assert.equal(command.input.ConsistentRead, undefined); // should be omitted
         assert.equal(command.input.ExclusiveStartKey?.id, 'PATIENT#1');
-        assert.equal(command.input.ProjectionExpression, 'patientId, queueNumber, fullName, age, #status, aiAssessment, staffDecision, createdAt, entityType, isEscalated, escalatedBy');
+        assert.equal(command.input.ProjectionExpression, 'patientId, queueNumber, fullName, age, sex, #status, aiAssessment, staffDecision, createdAt, entityType, isEscalated, escalatedBy');
         assert.deepEqual(command.input.ExpressionAttributeNames, { '#status': 'status' });
         
         return {
@@ -360,6 +360,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       queueNumber: 'MQ-20260623-0001',
       fullName: 'Alice',
       age: 20,
+      sex: 'Female',
       entityType: 'PATIENT_CHECKIN',
       status: 'WAITING',
       aiAssessment: {
@@ -412,6 +413,7 @@ test('Staff APIs - Service and Handler Tests', async (t) => {
       queueNumber: 'MQ-20260623-0001',
       fullName: 'Alice',
       age: 20,
+      sex: 'Female',
       status: 'WAITING',
       isEscalated: false,
       escalatedBy: null,
