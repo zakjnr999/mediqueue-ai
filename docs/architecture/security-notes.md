@@ -23,7 +23,7 @@ Access to the Staff Dashboard and clinical overrides is restricted to authorized
 ### 2.1 Amazon Cognito User Pools
 * Hospital staff must log in via a secure endpoint managed by **Amazon Cognito** to access protected resources.
 * Cognito issues JSON Web Tokens (JWT) upon successful authentication.
-* API Gateway endpoints (`PATCH /patients/{id}/priority`, `PATCH /patients/{id}/status`, `GET /queue`, etc.) check the authorization header to validate user identity.
+* API Gateway endpoints (`PATCH /patients/{id}/priority`, `PATCH /patients/{id}/status`, `GET /queue`, etc.) use a Cognito User Pools authorizer to validate the JWT in the `Authorization` header and establish the caller identity.
 
 ### 2.2 Access Control
 * Authenticated staff users are authorized to view the queue, input overrides, escalate patients, and update patient queue statuses.
