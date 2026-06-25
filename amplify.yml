@@ -22,5 +22,11 @@ applications:
           - .next/cache/**/*
     env:
       variables:
-        NEXT_PUBLIC_MEDIQUEUE_API_URL: https://p7xz21rbv0.execute-api.us-west-2.amazonaws.com/dev
+        # ── Server-side env var (never NEXT_PUBLIC_) ──
+        # The proxy route uses this to forward requests to the backend.
+        MEDIQUEUE_API_URL: https://p7xz21rbv0.execute-api.us-west-2.amazonaws.com/dev
+        # ── Public env vars ──
+        # The browser sends requests to "/api/*" (Next.js proxy), which
+        # forwards to the real backend using MEDIQUEUE_API_URL above.
+        NEXT_PUBLIC_MEDIQUEUE_API_URL: /api
         NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID: 662td5f2613fh0mtt8cra2dr1c
