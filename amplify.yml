@@ -11,7 +11,7 @@ applications:
             - npm run build
             - cp -R frontend/.next .next
       artifacts:
-        baseDirectory: .next
+        baseDirectory: apps/web/.next
         files:
           - '**/*'
       cache:
