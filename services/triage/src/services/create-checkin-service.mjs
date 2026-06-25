@@ -2,6 +2,21 @@ import crypto from 'node:crypto';
 import { validateCheckinRequest } from '../validation/validate-checkin-request.mjs';
 import { CheckinError } from '../errors/checkin-error.mjs';
 
+function buildFallbackAssessment(normalized) {
+  const symptomText = normalized.symptoms.join(', ');
+  const detailText = normalized.additionalDetails
+    ? ` Details provided: ${normalized.additionalDetails}`
+    : '';
+
+  return {
+    summary: `Patient reported: ${symptomText}.${detailText}`,
+    redFlags: [],
+    suggestedPriority: 'MEDIUM',
+    reason: 'Automated triage analysis was unavailable, so this check-in requires staff review.',
+    requiresImmediateStaffReview: true
+  };
+}
+
 /**
  * Business service to orchestrate a patient check-in.
  * 
@@ -44,12 +59,11 @@ export async function createCheckinService(rawRequest, deps = {}) {
     if (err instanceof CheckinError) {
       throw err;
     }
-    throw new CheckinError(
-      'TRIAGE_PROCESSING_ERROR',
-      500,
-      `Symptom analysis failed: ${err.message}`,
-      err
-    );
+    console.warn('Symptom analysis failed; using conservative fallback assessment', {
+      errorName: err?.name,
+      errorMessage: err?.message
+    });
+    assessment = buildFallbackAssessment(normalized);
   }
 
   // 3. Generate date and time parameters in UTC

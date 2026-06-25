@@ -276,26 +276,31 @@ test('Check-In Service Offline Mocks Tests', async (t) => {
     assert.equal(saveCalled, false);
   });
 
-  await t.test('9. Queue number generator and save are not called when Bedrock triage fails', async () => {
+  await t.test('9. Bedrock triage failure uses conservative fallback and still saves check-in', async () => {
     let queueGenCalled = false;
     let saveCalled = false;
+    let savedItem = null;
     const deps = {
       analyseSymptomsFn: async () => {
         throw new Error('Bedrock Timeout');
       },
       generateQueueNumberFn: async () => { queueGenCalled = true; return 'MQ-1'; },
-      savePatientFn: async () => { saveCalled = true; },
+      savePatientFn: async (item) => {
+        saveCalled = true;
+        savedItem = item;
+      },
       generateIdFn: fixedId,
       nowFn: fixedNow
     };
 
-    try {
-      await createCheckinService(validRequest, deps);
-    } catch (err) {
-      assert.equal(err.code, 'TRIAGE_PROCESSING_ERROR');
-    }
-    assert.equal(queueGenCalled, false);
-    assert.equal(saveCalled, false);
+    const response = await createCheckinService(validRequest, deps);
+    assert.equal(queueGenCalled, true);
+    assert.equal(saveCalled, true);
+    assert.equal(savedItem.aiAssessment.suggestedPriority, 'MEDIUM');
+    assert.equal(savedItem.aiAssessment.requiresImmediateStaffReview, true);
+    assert.equal(response.aiAssessment.suggestedPriority, 'MEDIUM');
+    assert.equal(response.aiAssessment.requiresImmediateStaffReview, true);
+    assert.match(response.aiAssessment.reason, /staff review/i);
   });
 
   await t.test('10. Patient save is not called when queue generation fails', async () => {
