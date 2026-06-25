@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
+import { getIdToken } from '@/lib/api/client';
 import { useCheckin } from '@/hooks/use-checkin';
 import { Landing } from '@/components/patient/Landing';
 import { PersonalInfo } from '@/components/patient/PersonalInfo';
@@ -12,8 +13,30 @@ import { QueueConfirmation } from '@/components/patient/QueueConfirmation';
 import { StaffDashboard } from '@/components/staff/StaffDashboard';
 
 export default function Home() {
-  const [activePortal, setActivePortal] = useState<'patient' | 'staff'>('patient');
+  const [activePortal, setActivePortalState] = useState<'patient' | 'staff'>('patient');
   const patientsWaiting: number | null = null;
+
+  useEffect(() => {
+    try {
+      const savedPortal = sessionStorage.getItem('mediqueue_active_portal');
+      if (savedPortal === 'staff' || getIdToken()) {
+        setActivePortalState('staff');
+      }
+    } catch {
+      if (getIdToken()) {
+        setActivePortalState('staff');
+      }
+    }
+  }, []);
+
+  const setActivePortal = useCallback((portal: 'patient' | 'staff') => {
+    setActivePortalState(portal);
+    try {
+      sessionStorage.setItem('mediqueue_active_portal', portal);
+    } catch {
+      // sessionStorage may be blocked; the in-memory tab state still updates.
+    }
+  }, []);
 
   // Patient portal hooks
   const {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { apiPost, setIdToken } from '@/lib/api/client';
+import { apiPost, getIdToken, setIdToken } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { ApiHttpError, ApiNetworkError } from '@/lib/api/errors';
 import type { LoginResponse } from '@/types/api';
@@ -23,15 +23,21 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split('.')[1];
     if (!payload) return null;
-    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+    return JSON.parse(atob(padded));
   } catch {
     return null;
   }
 }
 
 export function useStaffAuth(onLoginSuccess?: () => void): UseStaffAuthReturn {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [email, setEmail] = useState('');
+  const storedToken = getIdToken();
+  const storedClaims = storedToken ? decodeJwtPayload(storedToken) : null;
+  const storedEmail = typeof storedClaims?.email === 'string' ? storedClaims.email : '';
+
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(storedToken));
+  const [email, setEmail] = useState(storedEmail);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
