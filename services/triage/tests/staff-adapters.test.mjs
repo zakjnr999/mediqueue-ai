@@ -287,9 +287,44 @@ test('Staff Handlers - Production Adapter Wiring and Error Safety Tests', async 
     DynamoDBDocumentClient.prototype.send = async (command) => {
       if (command.input.Key && command.input.Key.id === `PATIENT#${validUUID}`) {
         if (command.input.UpdateExpression) {
-          return { Attributes: { id: `PATIENT#${validUUID}`, entityType: 'PATIENT_CHECKIN', status: 'WAITING', updatedAt: '2026-06-23T14:30:00.000Z' } };
+          return {
+            Attributes: {
+              patientId: validUUID,
+              queueNumber: 'MQ-1234',
+              entityType: 'PATIENT_CHECKIN',
+              status: 'WAITING',
+              updatedAt: '2026-06-23T14:30:00.000Z',
+              isEscalated: true,
+              escalatedBy: 'Nurse Brenda',
+              staffDecision: {
+                confirmedPriority: 'HIGH',
+                reviewedAt: '2026-06-23T14:30:00.000Z',
+                overrideReason: 'Override priority',
+                reviewerDisplayName: 'Dr. Smith'
+              }
+            }
+          };
         }
-        return { Item: { id: `PATIENT#${validUUID}`, entityType: 'PATIENT_CHECKIN', status: 'WAITING', updatedAt: '2026-06-23T14:30:00.000Z', suggestedPriority: 'MEDIUM' } };
+        return {
+          Item: {
+            id: `PATIENT#${validUUID}`,
+            entityType: 'PATIENT_CHECKIN',
+            status: 'WAITING',
+            updatedAt: '2026-06-23T14:30:00.000Z',
+            aiAssessment: {
+              suggestedPriority: 'MEDIUM',
+              summary: 'Mock patient summary',
+              redFlags: [],
+              requiresImmediateStaffReview: false
+            },
+            staffDecision: {
+              confirmedPriority: null,
+              reviewedBy: null,
+              reviewedAt: null,
+              overrideReason: null
+            }
+          }
+        };
       }
       if (command.input.IndexName) {
         return { Items: [] };
@@ -301,7 +336,7 @@ test('Staff Handlers - Production Adapter Wiring and Error Safety Tests', async 
       const res1 = await updatePriorityProdHandler({
         headers: { Authorization: 'Bearer mock-token-test@hospital.com' },
         pathParameters: { patientId: validUUID },
-        body: JSON.stringify({ confirmedPriority: 'HIGH', reviewerDisplayName: 'Dr. Smith' })
+        body: JSON.stringify({ confirmedPriority: 'HIGH', overrideReason: 'Patient condition escalated', reviewerDisplayName: 'Dr. Smith' })
       });
       assert.equal(res1.statusCode, 200);
 
