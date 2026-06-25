@@ -7,6 +7,7 @@ import { StaffLogin } from '@/components/staff/StaffLogin';
 import { DashboardHeader } from '@/components/staff/DashboardHeader';
 import { MetricCards } from '@/components/staff/MetricCards';
 import { QueueStatusBar } from '@/components/staff/QueueStatusBar';
+import { QueueAnalytics } from '@/components/staff/QueueAnalytics';
 import { PatientCard } from '@/components/staff/PatientCard';
 import { EmptyState } from '@/components/staff/EmptyState';
 import { PriorityModal } from '@/components/staff/PriorityModal';
@@ -122,6 +123,8 @@ export function StaffDashboard() {
         />
 
         <MetricCards stats={stats} />
+
+        <QueueAnalytics patients={patients} stats={stats} />
 
         <QueueStatusBar
           patients={patients}
