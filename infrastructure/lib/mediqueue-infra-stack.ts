@@ -64,6 +64,7 @@ export class MediQueueInfraStack extends cdk.Stack {
         'queueNumber',
         'fullName',
         'age',
+        'sex',
         'status',
         'aiAssessment',
         'staffDecision',
