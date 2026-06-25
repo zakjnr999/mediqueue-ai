@@ -12,6 +12,9 @@ import { getMediqueueApiUrl } from '@/lib/config/server-env';
 
 const PROXY_TIMEOUT_MS = 15_000;
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
  * Catch-all HTTP method handler.
  * Next.js App Router supports this pattern for all standard methods.
@@ -59,32 +62,32 @@ export async function DELETE(
 // ── Core proxy logic ───────────────────────────────────────────────────────
 
 async function handleRequest(request: Request, path: string[]): Promise<Response> {
-  // Construct the target URL preserving the query string.
-  const searchParams = new URL(request.url).search;
-  const targetPath = `/${path.join('/')}${searchParams}`;
-  const targetUrl = `${getMediqueueApiUrl().replace(/\/+$/, '')}${targetPath}`;
-
-  // Build forwarded headers.
-  // We forward the original headers except for hop-by-hop headers that
-  // must NOT be passed to the upstream server.
-  const forwardedHeaders = new Headers(request.headers);
-  forwardedHeaders.delete('host');
-  forwardedHeaders.delete('connection');
-  forwardedHeaders.delete('keep-alive');
-  forwardedHeaders.delete('transfer-encoding');
-  forwardedHeaders.set('x-forwarded-host', new URL(targetUrl).host);
-  forwardedHeaders.set('x-forwarded-proto', 'https');
-
-  // Prepare the request body — GET/HEAD/OPTIONS must not carry a body.
-  const body = ['GET', 'HEAD', 'OPTIONS'].includes(request.method)
-    ? undefined
-    : await request.text();
-
   // Create an AbortController for the timeout.
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), PROXY_TIMEOUT_MS);
 
   try {
+    // Construct the target URL preserving the query string.
+    const searchParams = new URL(request.url).search;
+    const targetPath = `/${path.join('/')}${searchParams}`;
+    const targetUrl = `${getMediqueueApiUrl().replace(/\/+$/, '')}${targetPath}`;
+
+    // Build forwarded headers.
+    // We forward the original headers except for hop-by-hop headers that
+    // must NOT be passed to the upstream server.
+    const forwardedHeaders = new Headers(request.headers);
+    forwardedHeaders.delete('host');
+    forwardedHeaders.delete('connection');
+    forwardedHeaders.delete('keep-alive');
+    forwardedHeaders.delete('transfer-encoding');
+    forwardedHeaders.set('x-forwarded-host', new URL(targetUrl).host);
+    forwardedHeaders.set('x-forwarded-proto', 'https');
+
+    // Prepare the request body — GET/HEAD/OPTIONS must not carry a body.
+    const body = ['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+      ? undefined
+      : await request.text();
+
     const upstreamResponse = await fetch(targetUrl, {
       method: request.method,
       headers: forwardedHeaders,
@@ -122,19 +125,23 @@ async function handleRequest(request: Request, path: string[]): Promise<Response
     });
   } catch (err) {
     // Log the internal error server-side (visible in CloudWatch / terminal).
-    console.error(`[Proxy] Error forwarding ${request.method} ${targetUrl}:`, err);
+    console.error(`[Proxy] Error forwarding ${request.method} /${path.join('/')}:`, err);
 
     // Determine a safe user-facing error response.
     const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+    const isConfigError = err instanceof Error && err.message.includes('MEDIQUEUE_API_URL');
     const message = isTimeout
       ? 'The backend did not respond in time. Please try again.'
-      : 'Failed to reach backend. Please try again.';
-    const status = isTimeout ? 504 : 502;
+      : isConfigError
+        ? 'Service configuration is temporarily unavailable.'
+        : 'Failed to reach backend. Please try again.';
+    const status = isTimeout ? 504 : isConfigError ? 500 : 502;
+    const code = isTimeout ? 'PROXY_TIMEOUT' : isConfigError ? 'CONFIGURATION_ERROR' : 'PROXY_ERROR';
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: { code: isTimeout ? 'PROXY_TIMEOUT' : 'PROXY_ERROR', message },
+        error: { code, message },
       }),
       {
         status,
