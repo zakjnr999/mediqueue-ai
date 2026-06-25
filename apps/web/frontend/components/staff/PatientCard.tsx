@@ -120,7 +120,7 @@ export function PatientCard({
                 <Sparkles className="w-4 h-4 text-brand" />
                 <span className="text-xs font-bold text-brand uppercase tracking-wider">AI Clinical Triage Summary</span>
               </div>
-              <span className="text-[10px] font-mono bg-brand-light text-brand px-1.5 py-0.5 rounded font-bold">GEMINI AI</span>
+              <span className="text-[10px] font-mono bg-brand-light text-brand px-1.5 py-0.5 rounded font-bold">AMAZON BEDROCK</span>
             </div>
 
             <p className="text-xs text-text-primary leading-relaxed">{patient.aiSummary}</p>

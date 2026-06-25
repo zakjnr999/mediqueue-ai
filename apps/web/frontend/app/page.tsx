@@ -228,7 +228,7 @@ export default function Home() {
             </div>
 
             <footer className="px-5 py-3.5 bg-slate-50 border-t border-surface-border text-center text-[10px] text-text-tertiary">
-              MediQueue AI Triage &bull; Powered by Google Gemini AI and AWS Core
+              MediQueue AI Triage &bull; Powered by AWS Amazon Bedrock
             </footer>
           </div>
         </main>
