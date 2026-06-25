@@ -11,7 +11,7 @@ To comply with HIPAA (Health Insurance Portability and Accountability Act) and r
 ### PII Stripping Rule
 * **Amazon Bedrock AI** is a decision-support tool. Under no circumstances are patient identity parameters (Full Name, Phone number) transmitted to Bedrock model endpoints.
 * During check-in, the API Gateway/Lambda handler parses the payload.
-* **DynamoDB Write**: Saves the full payload (including `fullName` and `phoneNumber`) as plain text to the secure database partition.
+* **DynamoDB Write**: Saves the full payload (including `fullName` and `phoneNumber`) without field-level encryption (application-layer plaintext) to the secure database partition; DynamoDB still applies service-side encryption at rest.
 * **Bedrock Payload**: Only packages `age`, selected `symptoms` tags, and `additionalDetails` text to send to Amazon Bedrock. This prevents model training or caching from capturing personal identities.
 
 ---
