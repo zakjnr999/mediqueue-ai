@@ -1,6 +1,6 @@
 version: 1
 applications:
-  - appRoot: apps/web/frontend
+  - appRoot: apps/web
     frontend:
       phases:
         preBuild:
@@ -10,15 +10,15 @@ applications:
             - npm ci
         build:
           commands:
-            - npm run build
+            - npm run build -w frontend
       artifacts:
-        baseDirectory: .next
+        baseDirectory: frontend/.next
         files:
           - '**/*'
       cache:
         paths:
           - node_modules/**/*
-          - .next/cache/**/*
+          - frontend/.next/cache/**/*
     env:
       variables:
         # ── Server-side env var (never NEXT_PUBLIC_) ──
