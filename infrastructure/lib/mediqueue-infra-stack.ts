@@ -80,7 +80,7 @@ export class MediQueueInfraStack extends cdk.Stack {
     const commonEnv = {
       PATIENTS_TABLE_NAME: table.tableName,
       PATIENTS_QUEUE_INDEX_NAME: 'gsi1',
-      BEDROCK_MODEL_ID: 'anthropic.claude-3-haiku-20240307-v1:0',
+      BEDROCK_MODEL_ID: 'amazon.nova-2-lite-v1:0',
       AVERAGE_WAIT_TIME_MULTIPLIER: '5',
     };
 
