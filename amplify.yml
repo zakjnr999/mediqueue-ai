@@ -1,20 +1,21 @@
 version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - cd apps/web && npm ci
-    build:
-      commands:
-        - cd apps/web && npm run build
-  artifacts:
-    baseDirectory: apps/web/frontend/.next
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - apps/web/node_modules/**/*
-  env:
-    variables:
-      NEXT_PUBLIC_MEDIQUEUE_API_URL: https://p7xz21rbv0.execute-api.us-west-2.amazonaws.com/dev
-      NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID: 662td5f2613fh0mtt8cra2dr1c
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: frontend/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+    env:
+      variables:
+        NEXT_PUBLIC_MEDIQUEUE_API_URL: https://p7xz21rbv0.execute-api.us-west-2.amazonaws.com/dev
+        NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID: 662td5f2613fh0mtt8cra2dr1c
