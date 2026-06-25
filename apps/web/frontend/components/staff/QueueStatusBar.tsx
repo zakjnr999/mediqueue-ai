@@ -23,7 +23,7 @@ interface StatusCount {
 }
 
 export function QueueStatusBar({ patients, activeFilter, onFilterChange }: QueueStatusBarProps) {
-  const waiting = patients.filter((p) => p.status === 'WAITING').length;
+  const waiting = patients.filter((p) => p.status === 'WAITING' || p.status === 'ESCALATED').length;
   const inProgress = patients.filter((p) => p.status === 'IN_PROGRESS').length;
   const completed = patients.filter((p) => p.status === 'COMPLETED').length;
   const escalated = patients.filter((p) => p.status === 'ESCALATED').length;

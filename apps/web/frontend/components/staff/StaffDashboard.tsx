@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useQueue } from '@/hooks/use-queue';
 import { useStaffAuth } from '@/hooks/use-staff-auth';
 import { StaffLogin } from '@/components/staff/StaffLogin';
@@ -31,13 +32,12 @@ export function StaffDashboard() {
     patients,
     stats,
     isLoading: isLoadingQueue,
+    error: queueError,
     activeFilter,
-    sortBy,
     expandedPatientId,
     staffNotesInput,
     filteredPatients,
     setActiveFilter,
-    setSortBy,
     setExpandedPatientId,
     setStaffNotesInput,
     refresh: refreshQueue,
@@ -51,7 +51,7 @@ export function StaffDashboard() {
   // ── Auth state ───────────────────────────────────────────────
   const {
     isLoggedIn: isStaffLoggedIn,
-    email,
+    email: staffEmail,
     password,
     loginError: staffLoginError,
     isLoggingIn,
@@ -101,7 +101,7 @@ export function StaffDashboard() {
   if (!isStaffLoggedIn) {
     return (
       <StaffLogin
-        email={email}
+        email={staffEmail}
         password={password}
         loginError={staffLoginError}
         isLoggingIn={isLoggingIn}
@@ -120,7 +120,22 @@ export function StaffDashboard() {
           isLoading={isLoadingQueue}
           onRefresh={refreshQueue}
           onLogout={handleLogout}
+          userEmail={staffEmail}
         />
+
+        {/* Connection error banner */}
+        {queueError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-800 flex items-center gap-2 shadow-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+            <span className="flex-1">{queueError}</span>
+            <button
+              onClick={refreshQueue}
+              className="text-xs font-bold text-red-700 hover:underline shrink-0"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         <MetricCards stats={stats} />
 

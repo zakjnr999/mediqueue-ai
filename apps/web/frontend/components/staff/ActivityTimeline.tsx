@@ -33,12 +33,11 @@ export function ActivityTimeline({ patients }: ActivityTimelineProps) {
     const date = new Date(todayStart.getTime() + (now.getHours() + i) * 60 * 60 * 1000);
     const hour = date.getHours();
     const isCurrent = i === 0;
-    const isPast = date <= now;
     buckets.push({
       hour: hour.toString().padStart(2, '0'),
       label: hour === 0 ? '12a' : hour === 12 ? '12p' : hour > 12 ? `${hour - 12}p` : `${hour}a`,
       count: 0,
-      active: isCurrent && isPast,
+      active: isCurrent,
     });
   }
 

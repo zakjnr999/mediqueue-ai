@@ -41,24 +41,35 @@ export function PriorityChart({ patients }: PriorityChartProps) {
     );
   }
 
+  // Compute percentages using largest-remainder method so slices always sum to 100.
+  const raw = [high / total, medium / total, low / total];
+  const floored = raw.map((v) => Math.floor(v * 100));
+  const remainder = 100 - floored.reduce((a, b) => a + b, 0);
+  // Indices with the largest fractional parts get the extra percentage points.
+  const idxByFraction = raw
+    .map((v, i) => ({ i, frac: v * 100 - floored[i] }))
+    .sort((a, b) => b.frac - a.frac)
+    .map((v) => v.i);
+  const getPct = (i: number) => floored[i] + (idxByFraction.indexOf(i) < remainder ? 1 : 0);
+
   const slices: Slice[] = [
     {
       label: 'HIGH',
       value: high,
       color: '#DC2626',
-      percentage: Math.round((high / total) * 100),
+      percentage: getPct(0),
     },
     {
       label: 'MEDIUM',
       value: medium,
       color: '#D97706',
-      percentage: Math.round((medium / total) * 100),
+      percentage: getPct(1),
     },
     {
       label: 'LOW',
       value: low,
       color: '#0F7B5E',
-      percentage: Math.round((low / total) * 100),
+      percentage: getPct(2),
     },
   ];
 

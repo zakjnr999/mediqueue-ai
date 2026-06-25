@@ -8,9 +8,25 @@ interface DashboardHeaderProps {
   isLoading: boolean;
   onRefresh: () => void;
   onLogout: () => void;
+  userEmail: string;
 }
 
-export function DashboardHeader({ isLoading, onRefresh, onLogout }: DashboardHeaderProps) {
+/** Derive a display name and initials from an email address. */
+function deriveUserInfo(email: string): { initials: string; displayName: string } {
+  const local = email.split('@')[0] || email;
+  const parts = local.split(/[._-]/).filter(Boolean);
+  const displayName = parts
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join(' ');
+  const initials = parts
+    .map((p) => p.charAt(0).toUpperCase())
+    .join('')
+    .slice(0, 2);
+  return { initials: initials || '??', displayName: displayName || email };
+}
+
+export function DashboardHeader({ isLoading, onRefresh, onLogout, userEmail }: DashboardHeaderProps) {
+  const { initials, displayName } = deriveUserInfo(userEmail);
   return (
     <div className="bg-white rounded-xl border border-surface-border p-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -41,10 +57,10 @@ export function DashboardHeader({ isLoading, onRefresh, onLogout }: DashboardHea
 
         <div className="flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm">
-            NR
+            {initials}
           </span>
           <div className="hidden md:block">
-            <p className="text-xs font-bold text-text-primary">Nurse Rhoda</p>
+            <p className="text-xs font-bold text-text-primary">{displayName}</p>
             <button
               onClick={onLogout}
               className="text-[10px] text-red-600 font-semibold hover:underline block"

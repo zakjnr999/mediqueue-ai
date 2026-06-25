@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
+import { BarChart3, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Patient } from '@/types/patient';
 import type { Stats } from '@/types/queue';
 import { PriorityChart } from './PriorityChart';
 import { ActivityTimeline } from './ActivityTimeline';
 import { StatusBreakdown } from './StatusBreakdown';
-import { MetricCards } from './MetricCards';
 
 interface QueueAnalyticsProps {
   patients: Patient[];
@@ -59,9 +58,6 @@ export function QueueAnalytics({ patients, stats }: QueueAnalyticsProps) {
             className="overflow-hidden"
           >
             <div className="px-4 pb-5 space-y-6 border-t border-slate-100 pt-4">
-              {/* Metric cards row (compact variant) */}
-              <MetricCards stats={stats} />
-
               {/* Three-column grid for charts */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Priority donut */}
