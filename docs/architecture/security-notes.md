@@ -37,6 +37,6 @@ Access to the Staff Dashboard and clinical overrides is restricted to authorized
 * Direct AWS console logins require HTTPS.
 
 ### 3.2 Encryption at Rest
-* **Amazon DynamoDB**: Configured with default service-side encryption at rest using AWS-managed keys (KMS).
+* **Amazon DynamoDB**: Encrypted at rest using DynamoDB default service-side encryption (AWS-owned key) unless configured to use an AWS-managed or customer-managed KMS key.
 * **Local Storage / Session Cache**: Patient queue tokens stored in the browser's `localStorage` contain only UUID session references (`patientId`), not PHI attributes.
 
