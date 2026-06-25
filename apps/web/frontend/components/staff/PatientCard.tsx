@@ -16,7 +16,8 @@ interface PatientCardProps {
   onToggleExpand: () => void;
   onConfirmPriority: () => void;
   onOpenOverride: () => void;
-  onUpdateStatus: (status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'ESCALATED') => void;
+  onUpdateStatus: (status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED') => void;
+  onEscalate?: () => void;
   onSaveNotes: (notes: string) => void;
   onStaffNotesChange: (val: string) => void;
 }
@@ -37,6 +38,7 @@ export function PatientCard({
   onConfirmPriority,
   onOpenOverride,
   onUpdateStatus,
+  onEscalate,
   onSaveNotes,
   onStaffNotesChange,
 }: PatientCardProps) {
@@ -240,7 +242,7 @@ export function PatientCard({
                   Mark Attending
                 </button>
                 <button
-                  onClick={() => onUpdateStatus('ESCALATED')}
+                  onClick={onEscalate}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-800 hover:bg-red-200 border border-red-300 transition flex items-center gap-1.5"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
