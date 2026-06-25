@@ -9,13 +9,15 @@ applications:
         build:
           commands:
             - npm run build
+            - cp -R frontend/.next .next
       artifacts:
-        baseDirectory: frontend/.next
+        baseDirectory: .next
         files:
           - '**/*'
       cache:
         paths:
           - node_modules/**/*
+          - .next/cache/**/*
     env:
       variables:
         NEXT_PUBLIC_MEDIQUEUE_API_URL: https://p7xz21rbv0.execute-api.us-west-2.amazonaws.com/dev
