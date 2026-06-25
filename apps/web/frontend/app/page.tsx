@@ -1,34 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, AlertTriangle, ArrowRight, RefreshCw, Phone } from 'lucide-react';
-import type { PatientPriority } from '@/types/patient';
+import React, { useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import { CheckCircle } from 'lucide-react';
 import { useCheckin } from '@/hooks/use-checkin';
-import { useQueue } from '@/hooks/use-queue';
-import { useStaffAuth } from '@/hooks/use-staff-auth';
 import { Landing } from '@/components/patient/Landing';
 import { PersonalInfo } from '@/components/patient/PersonalInfo';
 import { SymptomSelection } from '@/components/patient/SymptomSelection';
 import { ReviewConfirm } from '@/components/patient/ReviewConfirm';
 import { QueueConfirmation } from '@/components/patient/QueueConfirmation';
-import { StaffLogin } from '@/components/staff/StaffLogin';
-import { DashboardHeader } from '@/components/staff/DashboardHeader';
-import { MetricCards } from '@/components/staff/MetricCards';
-import { FilterBar } from '@/components/staff/FilterBar';
-import { PatientCard } from '@/components/staff/PatientCard';
-import { EmptyState } from '@/components/staff/EmptyState';
-import { PriorityModal } from '@/components/staff/PriorityModal';
+import { StaffDashboard } from '@/components/staff/StaffDashboard';
 
 export default function Home() {
   const [activePortal, setActivePortal] = useState<'patient' | 'staff'>('patient');
-
-  // Current time for elapsed-time calculations in staff cards
-  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(Date.now()), 15000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Patient portal hooks
   const {
@@ -47,59 +31,6 @@ export default function Home() {
     handleStatusCheck,
     resetPatientFlow,
   } = useCheckin();
-
-  // Staff portal hooks
-  const {
-    patients,
-    stats,
-    isLoading: isLoadingQueue,
-    activeFilter,
-    sortBy,
-    expandedPatientId,
-    staffNotesInput,
-    filteredPatients,
-    setActiveFilter,
-    setSortBy,
-    setExpandedPatientId,
-    setStaffNotesInput,
-    refresh: refreshQueue,
-    confirmPriority,
-    overridePriority,
-    updateStatus,
-    saveNotes,
-  } = useQueue();
-
-  const {
-    isLoggedIn: isStaffLoggedIn,
-    email,
-    password,
-    loginError: staffLoginError,
-    isLoggingIn,
-    setEmail,
-    setPassword,
-    handleLogin: handleStaffLogin,
-    handleLogout,
-  } = useStaffAuth(refreshQueue);
-
-  // Override priority modal state (S3)
-  const [overridePatient, setOverridePatient] = useState<typeof patients[number] | null>(null);
-  const [overridePriorityValue, setOverridePriorityValue] = useState<PatientPriority>('LOW');
-  const [overrideReason, setOverrideReason] = useState('');
-  const [isSavingOverride, setIsSavingOverride] = useState(false);
-
-  const openOverrideModal = useCallback((p: typeof patients[number]) => {
-    setOverridePatient(p);
-    setOverridePriorityValue(p.confirmedPriority || p.aiSuggestedPriority);
-    setOverrideReason(p.overrideReason || '');
-  }, []);
-
-  const handleSaveOverride = useCallback(async () => {
-    if (!overridePatient) return;
-    setIsSavingOverride(true);
-    await overridePriority(overridePatient.id, overridePriorityValue, overrideReason);
-    setIsSavingOverride(false);
-    setOverridePatient(null);
-  }, [overridePatient, overridePriorityValue, overrideReason, overridePriority]);
 
   return (
     <div className="min-h-screen bg-surface-grey flex flex-col antialiased font-sans">
@@ -236,73 +167,10 @@ export default function Home() {
 
       {/* STAFF PORTAL */}
       {activePortal === 'staff' && (
-        <main className="flex-1 flex flex-col p-4 max-w-7xl w-full mx-auto space-y-4">
-          {!isStaffLoggedIn ? (
-            <StaffLogin
-              email={email}
-              password={password}
-              loginError={staffLoginError}
-              isLoggingIn={isLoggingIn}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              onSubmit={handleStaffLogin}
-            />
-          ) : (
-            <div className="space-y-4 flex flex-col flex-1">
-              <DashboardHeader
-                isLoading={isLoadingQueue}
-                onRefresh={refreshQueue}
-                onLogout={handleLogout}
-              />
-
-              <MetricCards stats={stats} />
-
-              <FilterBar
-                activeFilter={activeFilter}
-                sortBy={sortBy}
-                onFilterChange={setActiveFilter}
-                onSortChange={setSortBy}
-              />
-
-              <div className="space-y-3 flex-1 overflow-y-auto">
-                {filteredPatients.length === 0 ? (
-                  <EmptyState onRefresh={refreshQueue} />
-                ) : (
-                  filteredPatients.map((patient) => (
-                    <PatientCard
-                      key={patient.id}
-                      patient={patient}
-                      isExpanded={expandedPatientId === patient.id}
-                      currentTime={currentTime}
-                      staffNotesInput={staffNotesInput}
-                      onToggleExpand={() => setExpandedPatientId(
-                        expandedPatientId === patient.id ? null : patient.id
-                      )}
-                      onConfirmPriority={() => confirmPriority(patient.id)}
-                      onOpenOverride={() => openOverrideModal(patient)}
-                      onUpdateStatus={(status) => updateStatus(patient.id, status)}
-                      onSaveNotes={(notes) => saveNotes(patient.id, notes)}
-                      onStaffNotesChange={setStaffNotesInput}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+        <main className="flex-1 flex flex-col p-4 max-w-7xl w-full mx-auto">
+          <StaffDashboard />
         </main>
       )}
-
-      {/* OVERRIDE PRIORITY MODAL */}
-      <PriorityModal
-        patient={overridePatient}
-        overridePriority={overridePriorityValue}
-        overrideReason={overrideReason}
-        isSaving={isSavingOverride}
-        onPriorityChange={setOverridePriorityValue}
-        onReasonChange={setOverrideReason}
-        onSave={handleSaveOverride}
-        onClose={() => setOverridePatient(null)}
-      />
     </div>
   );
 }
