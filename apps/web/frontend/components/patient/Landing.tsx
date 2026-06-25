@@ -10,6 +10,7 @@ interface LandingProps {
   statusCheckError: string;
   onStatusCheckChange: (val: string) => void;
   onStatusCheckSubmit: (e: React.FormEvent) => void;
+  patientsWaiting: number;
 }
 
 export function Landing({
@@ -18,6 +19,7 @@ export function Landing({
   statusCheckError,
   onStatusCheckChange,
   onStatusCheckSubmit,
+  patientsWaiting,
 }: LandingProps) {
   return (
     <motion.div
@@ -42,7 +44,7 @@ export function Landing({
             <p className="text-xs font-semibold text-brand tracking-wider uppercase">Live Queue Stat</p>
             <p className="text-sm text-brand-dark font-medium">Patients waiting currently</p>
           </div>
-          <span className="text-3xl font-extrabold text-brand-dark">14</span>
+          <span className="text-3xl font-extrabold text-brand-dark">{patientsWaiting}</span>
         </div>
 
         <div className="space-y-3 pt-4">

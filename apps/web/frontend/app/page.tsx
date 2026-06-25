@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
 import { useCheckin } from '@/hooks/use-checkin';
@@ -10,9 +10,24 @@ import { SymptomSelection } from '@/components/patient/SymptomSelection';
 import { ReviewConfirm } from '@/components/patient/ReviewConfirm';
 import { QueueConfirmation } from '@/components/patient/QueueConfirmation';
 import { StaffDashboard } from '@/components/staff/StaffDashboard';
+import { apiGet } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
+import type { QueueStatsResponse } from '@/types/api';
 
 export default function Home() {
   const [activePortal, setActivePortal] = useState<'patient' | 'staff'>('patient');
+  const [patientsWaiting, setPatientsWaiting] = useState(0);
+
+  // Fetch live queue count for the landing page
+  useEffect(() => {
+    apiGet<QueueStatsResponse>(ENDPOINTS.queue.stats, { timeout: 5000 })
+      .then((res) => {
+        if (res.success) setPatientsWaiting(res.data.inQueue);
+      })
+      .catch(() => {
+        // Silent fail — landing shows 0 when backend is unreachable
+      });
+  }, []);
 
   // Patient portal hooks
   const {
@@ -116,6 +131,7 @@ export default function Home() {
                     statusCheckError={statusCheckError}
                     onStatusCheckChange={setStatusCheckQueueNum}
                     onStatusCheckSubmit={handleStatusCheck}
+                    patientsWaiting={patientsWaiting}
                   />
                 )}
                 {patientStep === 'P1' && (
