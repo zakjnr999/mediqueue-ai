@@ -10,3 +10,7 @@ build/
 coverage/
 .lambda-package/
 *.zip
+cdk.out/
+cdk.context.json
+Project\ Guide.pdf
+Project Guide.pdf
