@@ -28,10 +28,15 @@ export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 // ── Specific response shapes ───────────────────────────────────────────────
 
+/** Response from POST /auth/login — wraps the Cognito tokens. */
 export interface LoginResponse {
-  idToken: string;
-  email: string;
-  username: string;
+  success: true;
+  data: {
+    accessToken: string;
+    idToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  };
 }
 
 export interface CreateCheckinResponse {
