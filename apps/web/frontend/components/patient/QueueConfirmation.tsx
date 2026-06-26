@@ -11,6 +11,14 @@ interface QueueConfirmationProps {
   onReset: () => void;
 }
 
+function formatPatientWaitGuidance(minutes: number): string {
+  if (!minutes || minutes <= 0) return 'Being reviewed';
+  if (minutes <= 10) return 'Soon';
+  if (minutes <= 30) return 'Short wait';
+  if (minutes <= 60) return 'Moderate wait';
+  return 'Please stay nearby';
+}
+
 export function QueueConfirmation({ result, phone, onReset }: QueueConfirmationProps) {
   return (
     <motion.div
@@ -33,9 +41,9 @@ export function QueueConfirmation({ result, phone, onReset }: QueueConfirmationP
         </div>
 
         <div className="border-t border-brand/10 pt-3 flex justify-between items-center">
-          <span className="text-sm text-text-secondary font-medium">Estimated wait</span>
+          <span className="text-sm text-text-secondary font-medium">Wait guidance</span>
           <span className="text-lg font-bold text-text-primary">
-            {result.estimatedWaitMinutes > 0 ? `~ ${result.estimatedWaitMinutes} minutes` : 'Immediate'}
+            {formatPatientWaitGuidance(result.estimatedWaitMinutes)}
           </span>
         </div>
 

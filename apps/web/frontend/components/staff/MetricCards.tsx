@@ -7,6 +7,15 @@ interface MetricCardsProps {
   stats: Stats;
 }
 
+function formatWaitGuidance(minutes: number): string {
+  if (!minutes || minutes <= 0) return '—';
+  if (minutes <= 10) return '<10m';
+  if (minutes <= 30) return '10-30m';
+  if (minutes <= 60) return '30-60m';
+  if (minutes <= 120) return '1-2h';
+  return '2h+';
+}
+
 export function MetricCards({ stats }: MetricCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -19,10 +28,10 @@ export function MetricCards({ stats }: MetricCardsProps) {
       </div>
 
       <div className="bg-white border border-surface-border rounded-lg p-4 flex flex-col justify-between shadow-sm">
-        <span className="text-xs font-bold text-text-tertiary uppercase">Average wait</span>
+        <span className="text-xs font-bold text-text-tertiary uppercase">Wait guidance</span>
         <div className="flex items-baseline justify-between mt-2">
-          <span className="text-3xl font-bold text-text-primary">~{stats.averageWaitMinutes}m</span>
-          <span className="text-xs text-text-secondary">estimate</span>
+          <span className="text-3xl font-bold text-text-primary">{formatWaitGuidance(stats.averageWaitMinutes)}</span>
+          <span className="text-xs text-text-secondary">planning</span>
         </div>
       </div>
 
